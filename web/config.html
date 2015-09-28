@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html><head>
+  <meta HTTP-EQUIV="Pragma" CONTENT="no-cache">
+  <meta HTTP-EQUIV="Expires" CONTENT="-1">
+  <title>Fourcast Configuration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+  <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+  <script src="//code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+  <script>
+"use strict";
+(function () {
+  var data;
+  var $fields;
+
+  function load() {
+    $fields.each(function () {
+      var $field = $(this);
+      var $input = $field.find('input');
+      var name = $field.attr('name') || $input.attr('name');
+      var value = data[name];
+      if (value == null) return;
+      if ($input.attr('type') == 'radio') {
+        $input.filter('[name=' + name + '][value=' + value + ']').prop('checked', true);
+        $field.controlgroup('refresh');
+      } else {
+        $field.val(value);
+      }
+      $field.change();
+    });
+  }
+
+  function save() {
+    data = {};
+    $fields.each(function () {
+      var $field = $(this);
+      var $input = $field.find('input');
+      var name = $field.attr('name') || $input.attr('name');
+      if ($input.attr('type') == 'radio')
+        data[name] = $input.filter(':checked').attr('value');
+      else
+        data[name] = $field.val();
+    });
+    alert(JSON.stringify(data));
+  }
+
+  function close() {
+    location.href = 'pebblejs://close#' + encodeURIComponent( JSON.stringify(data) );
+  }
+
+  $(function () {
+    $fields = $('.field');
+
+    $('#done').click(function (e) {
+      e.preventDefault();
+      save();
+      close();
+    });
+
+    var c, colors = [];
+    for (var i = 0; i < 64; i++) {
+      c = ('00'+i.toString(4)).slice(-3);
+      c = (c[0]*5).toString(16)+(c[1]*5).toString(16)+(c[2]*5).toString(16);
+      colors.push(c[0]+c[0]+c[1]+c[1]+c[2]+c[2]);
+    }
+
+    $('.color-picker')
+      .each(function () {
+        var $field = $(this);
+        $field
+          .css({ visibility: 'hidden' })
+          .change(function () {
+            $field.parent().css({ backgroundColor: '#' + $field.val() });
+          })
+          .parent()
+            .css({
+              width: '2.2em',
+              height: '2.2em'
+            })
+            .click(function (e) {
+              var windowHeight = $(window).height();
+              var windowWidth = $(window).width();
+              var paneSize = Math.floor(Math.min(windowHeight, windowWidth)/8);
+              var paletteSize = paneSize * 8;
+              var $palette = $('<div />')
+                    .css({ position: 'fixed',
+                           zIndex: 99999,
+                           width: paletteSize + 'px',
+                           top: ( windowHeight - paletteSize ) / 2,
+                           left: ( windowWidth - paletteSize ) / 2 })
+                    .appendTo(document.body);
+              colors.forEach(function (color) {
+                $('<div />')
+                  .css({ 'float': 'left',
+                         width: paneSize + 'px',
+                         height: paneSize + 'px',
+                         backgroundColor: '#' + color })
+                  .click(function () {
+                    $field.val(color).change();
+                  })
+                  .appendTo($palette);
+              });
+              $(document).click(function (_e) {
+                if (_e.originalEvent !== e.originalEvent) {
+                  $palette.remove();
+                  $(this).off(_e);
+                }
+              });
+            });
+      });
+
+    try {
+      data = JSON.parse( decodeURIComponent( location.hash.substring(1) ) );
+      load();
+    } catch (e) {
+      data = {};
+    }
+  });
+})()
+  </script>
+</head><body>
+  <div data-role="page">
+    <div data-role="header">
+      <h1>Fourcast Config</h1>
+      <a href="pebblejs://close" class="ui-btn ui-btn-left" id="cancel">Cancel</a>
+      <a href="pebblejs://close" class="ui-btn ui-btn-right" id="done">Done</a>
+    </div>
+
+    <div data-role="main" class="ui-content">
+      <div class="ui-field-contain">
+        <fieldset data-role="controlgroup" data-type="horizontal" class="field ui-field-contain">
+          <legend>Temperature Units</legend>
+          <input type="radio" name="temp_units" id="temp_units_f" value="f">
+          <label for="temp_units_f">&deg;F</label>
+          <input type="radio" name="temp_units" id="temp_units_c" value="c">
+          <label for="temp_units_c">&deg;C</label>
+        </fieldset>
+
+        <div class="ui-field-contain">
+          <label for="bg_color">Background Color</label>
+          <input type="text" name="bg_color" id="bg_color" class="field color-picker" />
+        </div>
+
+        <div class="ui-field-contain">
+          <label for="text_color">Text Color</label>
+          <input type="text" name="text_color" id="text_color" class="field color-picker" />
+        </div>
+      </div>
+    </div>
+  </div>
+</body></html>
