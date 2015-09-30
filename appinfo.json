@@ -1,7 +1,6 @@
 {
     "appKeys": {
         "KEY_CITY": 21,
-        "KEY_CONDITIONS": 2,
         "KEY_FORECAST_0_CONDITIONS": 8,
         "KEY_FORECAST_0_DAY": 3,
         "KEY_FORECAST_0_MAX_C": 6,
@@ -20,8 +19,9 @@
         "KEY_FORECAST_2_MAX_F": 19,
         "KEY_FORECAST_2_MIN_C": 16,
         "KEY_FORECAST_2_MIN_F": 17,
-        "KEY_TEMP_C": 0,
-        "KEY_TEMP_F": 1
+        "KEY_WEATHER_CONDITIONS": 2,
+        "KEY_WEATHER_TEMP_C": 0,
+        "KEY_WEATHER_TEMP_F": 1
     },
     "capabilities": [
         "location",

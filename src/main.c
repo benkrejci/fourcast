@@ -1,6 +1,8 @@
 #include <pebble.h>
 
 const int WEATHER_UPDATE_MINUTES = 30;
+const int POLL_MAX_TRIES = 6;
+const int POLL_TIMEOUT = 30;
 const int TIME_SIZE = 6;
 const char TIME_FORMAT_24HR[] = "%k:%M";
 const char TIME_FORMAT_12HR[] = "%l:%M";
@@ -24,9 +26,9 @@ const char DAY_FORMAT[] = "%a";*/
 #endif
 
 enum {
-  KEY_TEMP_C = 0,
-  KEY_TEMP_F = 1,
-  KEY_CONDITIONS = 2,
+  KEY_WEATHER_TEMP_C = 0,
+  KEY_WEATHER_TEMP_F = 1,
+  KEY_WEATHER_CONDITIONS = 2,
   KEY_FORECAST_0_DAY = 3,
   KEY_FORECAST_0_MIN_C = 4,
   KEY_FORECAST_0_MIN_F = 5,
@@ -45,7 +47,16 @@ enum {
   KEY_FORECAST_2_MAX_C = 18,
   KEY_FORECAST_2_MAX_F = 19,
   KEY_FORECAST_2_CONDITIONS = 20,
-  KEY_CITY = 21
+  KEY_CITY = 21,
+  
+  KEY_POLL_LAST_RECEIVED = 22,
+  KEY_WEATHER_TEMP = 23,
+  KEY_FORECAST_0_MIN = 24,
+  KEY_FORECAST_0_MAX = 25,
+  KEY_FORECAST_1_MIN = 26,
+  KEY_FORECAST_1_MAX = 27,
+  KEY_FORECAST_2_MIN = 28,
+  KEY_FORECAST_2_MAX = 29
 };
 
 static int s_batt_percent = 0;
@@ -71,7 +82,7 @@ static char s_forecast_2_max_buffer[5];
 static char s_forecast_2_conditions_buffer[8];
 
 static Window *s_main_window;
-static BitmapLayer *s_bitmap_layer;
+/*static BitmapLayer *s_bitmap_layer;*/
 /*static GBitmap *s_background_bitmap;*/
 static TextLayer *s_time_layer;
 static Layer *s_battery_layer;
@@ -99,10 +110,7 @@ static GFont s_font_small;
 static GFont s_font_small_text;
 static GFont s_font_weather_icons;
 
-static void update_time() {
-  time_t temp = time(NULL);
-  struct tm *tick_time = localtime(&temp);
-  
+static void update_time(struct tm *tick_time) {
   if (clock_is_24h_style() == true) {
     strftime(s_time_buffer, TIME_SIZE, TIME_FORMAT_24HR, tick_time);
   } else {
@@ -162,6 +170,23 @@ static void weather_border_update_proc(Layer *layer, GContext *ctx) {
     update_background_color();
   }
 #endif*/
+
+static void update_weather() {
+  text_layer_set_text(s_weather_temp_layer, s_weather_temp_buffer);
+  text_layer_set_text(s_weather_conditions_layer, s_weather_conditions_buffer);
+  text_layer_set_text(s_forecast_0_day_layer, s_forecast_0_day_buffer);
+  text_layer_set_text(s_forecast_0_min_layer, s_forecast_0_min_buffer);
+  text_layer_set_text(s_forecast_0_max_layer, s_forecast_0_max_buffer);
+  text_layer_set_text(s_forecast_0_conditions_layer, s_forecast_0_conditions_buffer);
+  text_layer_set_text(s_forecast_1_day_layer, s_forecast_1_day_buffer);
+  text_layer_set_text(s_forecast_1_min_layer, s_forecast_1_min_buffer);
+  text_layer_set_text(s_forecast_1_max_layer, s_forecast_1_max_buffer);
+  text_layer_set_text(s_forecast_1_conditions_layer, s_forecast_1_conditions_buffer);
+  text_layer_set_text(s_forecast_2_day_layer, s_forecast_2_day_buffer);
+  text_layer_set_text(s_forecast_2_min_layer, s_forecast_2_min_buffer);
+  text_layer_set_text(s_forecast_2_max_layer, s_forecast_2_max_buffer);
+  text_layer_set_text(s_forecast_2_conditions_layer, s_forecast_2_conditions_buffer);
+}
 
 static void main_window_load(Window *window) {
   s_font_big = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_SQUARE_54));
@@ -226,14 +251,14 @@ static void main_window_load(Window *window) {
   layer_set_update_proc(s_weather_border_layer, weather_border_update_proc);
   layer_add_child(window_get_root_layer(window), s_weather_border_layer);
   
-  s_weather_conditions_layer = text_layer_create(GRect(0, 114, 36, 25));
+  s_weather_conditions_layer = text_layer_create(GRect(0, 112, 36, 25));
   text_layer_set_background_color(s_weather_conditions_layer, GColorClear);
   text_layer_set_text_color(s_weather_conditions_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_weather_conditions_layer, s_font_weather_icons);
   text_layer_set_text_alignment(s_weather_conditions_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_conditions_layer));
   
-  s_weather_temp_layer = text_layer_create(GRect(0, 140, 36, 25));
+  s_weather_temp_layer = text_layer_create(GRect(0, 138, 36, 25));
   text_layer_set_background_color(s_weather_temp_layer, GColorClear);
   text_layer_set_text_color(s_weather_temp_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_weather_temp_layer, s_font_small);
@@ -326,6 +351,8 @@ static void main_window_load(Window *window) {
   text_layer_set_font(s_forecast_2_min_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_2_min_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_2_min_layer));
+  
+  update_weather();
 }
 
 static void main_window_unload(Window *window) {
@@ -356,19 +383,7 @@ static void main_window_unload(Window *window) {
   fonts_unload_custom_font(s_font_small_text);
 }
 
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  update_time();
-  
-  // Get weather update every 30 minutes
-  if(tick_time->tm_min % WEATHER_UPDATE_MINUTES == 0) {
-    DictionaryIterator *iter;
-    app_message_outbox_begin(&iter);
-    dict_write_uint8(iter, 0, 0);
-    app_message_outbox_send();
-  }
-}
-
-static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+static void _inbox_received_callback(DictionaryIterator *iterator, void *context) {
   Tuple *t = dict_read_first(iterator);
   bool us_units = strcmp(i18n_get_system_locale(), "en_US") == 0;
 
@@ -378,117 +393,96 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         /*snprintf(s_city_buffer, sizeof(s_city_buffer), "%s", t->value->cstring);
         text_layer_set_text(s_city_layer, s_city_buffer);*/
       break;
-      case KEY_TEMP_C:
+      case KEY_WEATHER_TEMP_C:
         if (!us_units) {
           snprintf(s_weather_temp_buffer, sizeof(s_weather_temp_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_weather_temp_layer, s_weather_temp_buffer);
         }
       break;
-      case KEY_TEMP_F:
+      case KEY_WEATHER_TEMP_F:
         if (us_units) {
           snprintf(s_weather_temp_buffer, sizeof(s_weather_temp_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_weather_temp_layer, s_weather_temp_buffer);
         }
       break;
-      case KEY_CONDITIONS:
+      case KEY_WEATHER_CONDITIONS:
         snprintf(s_weather_conditions_buffer, sizeof(s_weather_conditions_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_weather_conditions_layer, s_weather_conditions_buffer);
       break;
       case KEY_FORECAST_0_DAY:
         snprintf(s_forecast_0_day_buffer, sizeof(s_forecast_0_day_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_0_day_layer, s_forecast_0_day_buffer);
       break;
       case KEY_FORECAST_0_MIN_C:
         if (!us_units) {
           snprintf(s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_0_min_layer, s_forecast_0_min_buffer);
         }
       break;
       case KEY_FORECAST_0_MIN_F:
         if (us_units) {
           snprintf(s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_0_min_layer, s_forecast_0_min_buffer);
         }
       break;
       case KEY_FORECAST_0_MAX_C:
         if (!us_units) {
           snprintf(s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_0_max_layer, s_forecast_0_max_buffer);
         }
       break;
       case KEY_FORECAST_0_MAX_F:
         if (us_units) {
           snprintf(s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_0_max_layer, s_forecast_0_max_buffer);
         }
       break;
       case KEY_FORECAST_0_CONDITIONS:
         snprintf(s_forecast_0_conditions_buffer, sizeof(s_forecast_0_conditions_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_0_conditions_layer, s_forecast_0_conditions_buffer);
       break;
       case KEY_FORECAST_1_DAY:
         snprintf(s_forecast_1_day_buffer, sizeof(s_forecast_1_day_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_1_day_layer, s_forecast_1_day_buffer);
       break;
       case KEY_FORECAST_1_MIN_C:
         if (!us_units) {
           snprintf(s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_1_min_layer, s_forecast_1_min_buffer);
         }
       break;
       case KEY_FORECAST_1_MIN_F:
         if (us_units) {
           snprintf(s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_1_min_layer, s_forecast_1_min_buffer);
         }
       break;
       case KEY_FORECAST_1_MAX_C:
         if (!us_units) {
           snprintf(s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_1_max_layer, s_forecast_1_max_buffer);
         }
       break;
       case KEY_FORECAST_1_MAX_F:
         if (us_units) {
           snprintf(s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_1_max_layer, s_forecast_1_max_buffer);
         }
       break;
       case KEY_FORECAST_1_CONDITIONS:
         snprintf(s_forecast_1_conditions_buffer, sizeof(s_forecast_1_conditions_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_1_conditions_layer, s_forecast_1_conditions_buffer);
       break;
       case KEY_FORECAST_2_DAY:
         snprintf(s_forecast_2_day_buffer, sizeof(s_forecast_2_day_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_2_day_layer, s_forecast_2_day_buffer);
       break;
       case KEY_FORECAST_2_MIN_C:
         if (!us_units) {
           snprintf(s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_2_min_layer, s_forecast_2_min_buffer);
         }
       break;
       case KEY_FORECAST_2_MIN_F:
         if (us_units) {
           snprintf(s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_2_min_layer, s_forecast_2_min_buffer);
         }
       break;
       case KEY_FORECAST_2_MAX_C:
         if (!us_units) {
           snprintf(s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_2_max_layer, s_forecast_2_max_buffer);
         }
       break;
       case KEY_FORECAST_2_MAX_F:
         if (us_units) {
           snprintf(s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer), "%s", t->value->cstring);
-          text_layer_set_text(s_forecast_2_max_layer, s_forecast_2_max_buffer);
         }
       break;
       case KEY_FORECAST_2_CONDITIONS:
         snprintf(s_forecast_2_conditions_buffer, sizeof(s_forecast_2_conditions_buffer), "%s", t->value->cstring);
-        text_layer_set_text(s_forecast_2_conditions_layer, s_forecast_2_conditions_buffer);
       break;
       default:
         APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);
@@ -497,18 +491,62 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
     t = dict_read_next(iterator);
   }
+  
+  update_weather();
 }
 
-static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+static time_t s_poll_last_action = 0;
+static int s_poll_current_try = 0;
+static int s_poll_last_received = 0;
+
+static void _request_poll() {
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  dict_write_uint8(iter, 0, 0);
+  app_message_outbox_send();
 }
 
-static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+static void request_poll() {
+  time_t current_time = time(NULL);
+  if (current_time - s_poll_last_action > POLL_TIMEOUT) {
+    s_poll_last_action = current_time;
+    s_poll_current_try = 0;
+    _request_poll();
+  }
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+  s_poll_last_action = time(NULL);
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  s_poll_current_try++;
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed: %d (try %d/%d)", reason, s_poll_current_try, POLL_MAX_TRIES);
+  if (s_poll_current_try < POLL_MAX_TRIES) {
+    _request_poll();
+  } else {
+    s_poll_last_action = 0;
+  }
+}
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  _inbox_received_callback(iterator, context);
+  s_poll_last_action = 0;
+  s_poll_last_received = (int)time(NULL);
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped: %d", reason);
+}
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  update_time(tick_time);
+  
+  int now = (int)time(NULL);
+  if (now - s_poll_last_received >= WEATHER_UPDATE_MINUTES * 60) {
+    request_poll();
+  }
 }
 
 static void init() {
@@ -519,7 +557,8 @@ static void init() {
   });
   window_stack_push(s_main_window, true);
   
-  update_time();
+  time_t t = time(NULL);
+  update_time(localtime(&t));
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   
   app_message_register_inbox_received(inbox_received_callback);
@@ -532,6 +571,26 @@ static void init() {
   /*#ifdef PBL_COLOR
     accel_tap_service_subscribe(tap_handler);
   #endif*/
+  
+  s_poll_last_received = persist_exists(KEY_POLL_LAST_RECEIVED) ? persist_read_int(KEY_POLL_LAST_RECEIVED) : 0;
+  if (persist_exists(KEY_WEATHER_TEMP)) {
+    persist_read_string(KEY_WEATHER_TEMP, s_weather_temp_buffer, sizeof(s_weather_temp_buffer));
+    persist_read_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer, sizeof(s_weather_conditions_buffer));
+    persist_read_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer, sizeof(s_forecast_0_day_buffer));
+    persist_read_string(KEY_FORECAST_0_MIN, s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer));
+    persist_read_string(KEY_FORECAST_0_MAX, s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer));
+    persist_read_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer, sizeof(s_forecast_0_conditions_buffer));
+    persist_read_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer, sizeof(s_forecast_1_day_buffer));
+    persist_read_string(KEY_FORECAST_1_MIN, s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer));
+    persist_read_string(KEY_FORECAST_1_MAX, s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer));
+    persist_read_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer, sizeof(s_forecast_1_conditions_buffer));
+    persist_read_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer, sizeof(s_forecast_2_day_buffer));
+    persist_read_string(KEY_FORECAST_2_MIN, s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer));
+    persist_read_string(KEY_FORECAST_2_MAX, s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer));
+    persist_read_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer, sizeof(s_forecast_2_conditions_buffer));
+  } else {
+    request_poll();
+  }
 }
 
 static void deinit() {
@@ -540,6 +599,26 @@ static void deinit() {
   /*#ifdef PBL_COLOR
     accel_tap_service_unsubscribe();
   #endif*/
+  
+  int stored_poll_last_received = persist_exists(KEY_POLL_LAST_RECEIVED) ? persist_read_int(KEY_POLL_LAST_RECEIVED) : 0;
+  if (s_poll_last_received != stored_poll_last_received) {
+    persist_write_int(KEY_POLL_LAST_RECEIVED, s_poll_last_received);
+    
+    persist_write_string(KEY_WEATHER_TEMP, s_weather_temp_buffer);
+    persist_write_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer);
+    persist_write_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer);
+    persist_write_string(KEY_FORECAST_0_MIN, s_forecast_0_min_buffer);
+    persist_write_string(KEY_FORECAST_0_MAX, s_forecast_0_max_buffer);
+    persist_write_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer);
+    persist_write_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer);
+    persist_write_string(KEY_FORECAST_1_MIN, s_forecast_1_min_buffer);
+    persist_write_string(KEY_FORECAST_1_MAX, s_forecast_1_max_buffer);
+    persist_write_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer);
+    persist_write_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer);
+    persist_write_string(KEY_FORECAST_2_MIN, s_forecast_2_min_buffer);
+    persist_write_string(KEY_FORECAST_2_MAX, s_forecast_2_max_buffer);
+    persist_write_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer);
+  }
 }
 
 int main(void) {

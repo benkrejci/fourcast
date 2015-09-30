@@ -74,9 +74,9 @@ function locationSuccess(pos) {
     var tempC = KtoC(json.main.temp);
     var tempF = CtoF(tempC);
     var appData = {
-      'KEY_TEMP_C': round(tempC),
-      'KEY_TEMP_F': round(tempF),
-      'KEY_CONDITIONS': getWeatherIcon(json.weather[0]),
+      'KEY_WEATHER_TEMP_C': round(tempC),
+      'KEY_WEATHER_TEMP_F': round(tempF),
+      'KEY_WEATHER_CONDITIONS': getWeatherIcon(json.weather[0]),
       'KEY_CITY': json.name
     };
     
@@ -123,11 +123,11 @@ function getWeather() {
   );
 }
 
-Pebble.addEventListener('ready', 
+/*Pebble.addEventListener('ready', 
   function(e) {
     getWeather();
   }
-);
+);*/
 
 Pebble.addEventListener('appmessage',
   function(e) {
