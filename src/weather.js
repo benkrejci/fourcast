@@ -1,6 +1,6 @@
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
-  Pebble.openURL('https://github.com/benkrejci/fourcast/config/index.html');
+  Pebble.openURL('https://raw.githubusercontent.com/benkrejci/fourcast/config/index.html');
 });
 
 var RETRIES = 3;
