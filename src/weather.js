@@ -1,6 +1,6 @@
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
-  Pebble.openURL('https://benkrejci.com/face-plant/config.htm');
+  Pebble.openURL('https://github.com/benkrejci/fourcast/config/index.html');
 });
 
 var RETRIES = 3;
