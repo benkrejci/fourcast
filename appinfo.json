@@ -1,0 +1,69 @@
+{
+    "appKeys": {
+        "KEY_CITY": 21,
+        "KEY_CONDITIONS": 2,
+        "KEY_FORECAST_0_CONDITIONS": 8,
+        "KEY_FORECAST_0_DAY": 3,
+        "KEY_FORECAST_0_MAX_C": 6,
+        "KEY_FORECAST_0_MAX_F": 7,
+        "KEY_FORECAST_0_MIN_C": 4,
+        "KEY_FORECAST_0_MIN_F": 5,
+        "KEY_FORECAST_1_CONDITIONS": 14,
+        "KEY_FORECAST_1_DAY": 9,
+        "KEY_FORECAST_1_MAX_C": 12,
+        "KEY_FORECAST_1_MAX_F": 13,
+        "KEY_FORECAST_1_MIN_C": 10,
+        "KEY_FORECAST_1_MIN_F": 11,
+        "KEY_FORECAST_2_CONDITIONS": 20,
+        "KEY_FORECAST_2_DAY": 15,
+        "KEY_FORECAST_2_MAX_C": 18,
+        "KEY_FORECAST_2_MAX_F": 19,
+        "KEY_FORECAST_2_MIN_C": 16,
+        "KEY_FORECAST_2_MIN_F": 17,
+        "KEY_TEMP_C": 0,
+        "KEY_TEMP_F": 1
+    },
+    "capabilities": [
+        "location",
+        "configurable"
+    ],
+    "companyName": "benkrejci.com",
+    "longName": "Fourcast",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "fonts/owfont-regular.ttf",
+                "name": "WEATHER_ICONS_26",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Anita semi square.ttf",
+                "name": "SQUARE_TEXT_22",
+                "trackingAdjust": -1,
+                "type": "font"
+            },
+            {
+                "file": "fonts/Square.ttf",
+                "name": "SQUARE_18",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Square.ttf",
+                "name": "SQUARE_54",
+                "type": "font"
+            }
+        ]
+    },
+    "sdkVersion": "3",
+    "shortName": "Fourcast",
+    "targetPlatforms": [
+        "aplite",
+        "basalt"
+    ],
+    "uuid": "7a7c8159-2036-44b3-b92b-182ddc9ef8de",
+    "versionLabel": "0.2",
+    "watchapp": {
+        "watchface": true
+    }
+}
