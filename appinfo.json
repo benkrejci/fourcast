@@ -43,14 +43,14 @@
                 "type": "font"
             },
             {
-                "file": "fonts/owfont-regular.ttf",
-                "name": "WEATHER_ICONS_26",
-                "type": "font"
-            },
-            {
                 "file": "fonts/Anita semi square.ttf",
                 "name": "SQUARE_TEXT_22",
                 "trackingAdjust": -1,
+                "type": "font"
+            },
+            {
+                "file": "fonts/owfont-regular.ttf",
+                "name": "WEATHER_ICONS_26",
                 "type": "font"
             }
         ]
