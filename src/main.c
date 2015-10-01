@@ -49,16 +49,16 @@ enum {
   KEY_FORECAST_2_CONDITIONS = 20,
   KEY_CITY = 21,
   
-  KEY_POLL_LAST_RECEIVED = 22,
-  KEY_WEATHER_TEMP = 23,
-  KEY_FORECAST_0_MIN = 24,
-  KEY_FORECAST_0_MAX = 25,
-  KEY_FORECAST_1_MIN = 26,
-  KEY_FORECAST_1_MAX = 27,
-  KEY_FORECAST_2_MIN = 28,
-  KEY_FORECAST_2_MAX = 29
+  KEY_TEMP_UNITS = 22,
+  KEY_BG_COLOR = 23,
+  KEY_TEXT_COLOR = 24,
+  
+  KEY_POLL_LAST_RECEIVED = 25
 };
 
+static char s_temp_units[] = "f";
+static uint8_t s_bg_color = COLOR_BG;
+static uint8_t s_text_color = COLOR_TEXT;
 static int s_batt_percent = 0;
 /*static char s_battery_buffer[] = "---";*/
 static char s_time_buffer[] = "XX:XX";
@@ -66,19 +66,26 @@ static char s_date_buffer[] = "XXX XXX XX";
 /*static char s_day_buffer[] = "X";
 static char s_date_combined_buffer[] = "X XXX XX";*/
 /*static char s_city_buffer[13];*/
-static char s_weather_temp_buffer[5];
+static char s_weather_temp_c_buffer[5];
+static char s_weather_temp_f_buffer[5];
 static char s_weather_conditions_buffer[8];
 static char s_forecast_0_day_buffer[4];
-static char s_forecast_0_min_buffer[5];
-static char s_forecast_0_max_buffer[5];
+static char s_forecast_0_min_c_buffer[5];
+static char s_forecast_0_min_f_buffer[5];
+static char s_forecast_0_max_c_buffer[5];
+static char s_forecast_0_max_f_buffer[5];
 static char s_forecast_0_conditions_buffer[8];
 static char s_forecast_1_day_buffer[4];
-static char s_forecast_1_min_buffer[5];
-static char s_forecast_1_max_buffer[5];
+static char s_forecast_1_min_c_buffer[5];
+static char s_forecast_1_min_f_buffer[5];
+static char s_forecast_1_max_c_buffer[5];
+static char s_forecast_1_max_f_buffer[5];
 static char s_forecast_1_conditions_buffer[8];
 static char s_forecast_2_day_buffer[4];
-static char s_forecast_2_min_buffer[5];
-static char s_forecast_2_max_buffer[5];
+static char s_forecast_2_min_c_buffer[5];
+static char s_forecast_2_min_f_buffer[5];
+static char s_forecast_2_max_c_buffer[5];
+static char s_forecast_2_max_f_buffer[5];
 static char s_forecast_2_conditions_buffer[8];
 
 static Window *s_main_window;
@@ -135,8 +142,8 @@ static void battery_handler(BatteryChargeState new_state) {
 
 static void battery_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  graphics_context_set_stroke_color(ctx, s_batt_percent > 20 ? (GColor)COLOR_BATT : (GColor)COLOR_BATT_LOW);
-  graphics_context_set_fill_color(ctx, s_batt_percent > 20 ? (GColor)COLOR_BATT : (GColor)COLOR_BATT_LOW);
+  graphics_context_set_stroke_color(ctx, s_batt_percent > 20 ? (GColor)s_text_color : (GColor)COLOR_BATT_LOW);
+  graphics_context_set_fill_color(ctx, s_batt_percent > 20 ? (GColor)s_text_color : (GColor)COLOR_BATT_LOW);
   graphics_draw_round_rect(ctx, GRect(0, 0, bounds.size.w, bounds.size.h), 1);
   
   int batt_px;
@@ -146,7 +153,7 @@ static void battery_update_proc(Layer *layer, GContext *ctx) {
 
 static void weather_border_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  graphics_context_set_stroke_color(ctx, (GColor)COLOR_TEXT);
+  graphics_context_set_stroke_color(ctx, (GColor)s_text_color);
   graphics_draw_round_rect(ctx, GRect(0, 0, bounds.size.w, bounds.size.h), 9);
 }
 
@@ -171,21 +178,40 @@ static void weather_border_update_proc(Layer *layer, GContext *ctx) {
   }
 #endif*/
 
-static void update_weather() {
-  text_layer_set_text(s_weather_temp_layer, s_weather_temp_buffer);
+static void update_ui() {
+  bool temp_c = strcmp(s_temp_units, "c") == 0;
+  text_layer_set_text(s_weather_temp_layer, temp_c ? s_weather_temp_c_buffer : s_weather_temp_f_buffer);
   text_layer_set_text(s_weather_conditions_layer, s_weather_conditions_buffer);
   text_layer_set_text(s_forecast_0_day_layer, s_forecast_0_day_buffer);
-  text_layer_set_text(s_forecast_0_min_layer, s_forecast_0_min_buffer);
-  text_layer_set_text(s_forecast_0_max_layer, s_forecast_0_max_buffer);
+  text_layer_set_text(s_forecast_0_min_layer, temp_c ? s_forecast_0_min_c_buffer : s_forecast_0_min_f_buffer);
+  text_layer_set_text(s_forecast_0_max_layer, temp_c ? s_forecast_0_max_c_buffer : s_forecast_0_min_f_buffer);
   text_layer_set_text(s_forecast_0_conditions_layer, s_forecast_0_conditions_buffer);
   text_layer_set_text(s_forecast_1_day_layer, s_forecast_1_day_buffer);
-  text_layer_set_text(s_forecast_1_min_layer, s_forecast_1_min_buffer);
-  text_layer_set_text(s_forecast_1_max_layer, s_forecast_1_max_buffer);
+  text_layer_set_text(s_forecast_1_min_layer, temp_c ? s_forecast_1_min_c_buffer : s_forecast_1_min_f_buffer);
+  text_layer_set_text(s_forecast_1_max_layer, temp_c ? s_forecast_1_max_c_buffer: s_forecast_1_max_f_buffer);
   text_layer_set_text(s_forecast_1_conditions_layer, s_forecast_1_conditions_buffer);
   text_layer_set_text(s_forecast_2_day_layer, s_forecast_2_day_buffer);
-  text_layer_set_text(s_forecast_2_min_layer, s_forecast_2_min_buffer);
-  text_layer_set_text(s_forecast_2_max_layer, s_forecast_2_max_buffer);
+  text_layer_set_text(s_forecast_2_min_layer, temp_c ? s_forecast_2_min_c_buffer : s_forecast_2_min_f_buffer);
+  text_layer_set_text(s_forecast_2_max_layer, temp_c ? s_forecast_2_max_c_buffer : s_forecast_2_max_f_buffer);
   text_layer_set_text(s_forecast_2_conditions_layer, s_forecast_2_conditions_buffer);
+  
+  window_set_background_color(s_main_window, (GColor)s_bg_color);
+  text_layer_set_text_color(s_date_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_time_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_weather_conditions_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_weather_temp_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_0_day_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_0_conditions_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_0_max_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_0_min_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_1_day_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_1_conditions_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_1_max_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_1_min_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_2_day_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_2_conditions_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_2_max_layer, (GColor)s_text_color);
+  text_layer_set_text_color(s_forecast_2_min_layer, (GColor)s_text_color);
 }
 
 static void main_window_load(Window *window) {
@@ -201,7 +227,6 @@ static void main_window_load(Window *window) {
   bitmap_layer_set_bitmap(s_bitmap_layer, s_background_bitmap);
   layer_add_child(window_get_root_layer(window), bitmap_layer_get_layer(s_bitmap_layer));*/
   
-  window_set_background_color(s_main_window, (GColor)COLOR_BG);
   
 
   /*s_city_layer = text_layer_create(GRect(-1, 0, 145, 25));
@@ -226,7 +251,6 @@ static void main_window_load(Window *window) {
 
   s_date_layer = text_layer_create(GRect(1, -4, 119, 25));
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_date_layer, s_font_small_text);
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentLeft);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_date_layer));
@@ -241,7 +265,6 @@ static void main_window_load(Window *window) {
 
   s_time_layer = text_layer_create(GRect(0, 24, 144, 60));
   text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_text_color(s_time_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_time_layer, s_font_big);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_layer));
@@ -253,14 +276,12 @@ static void main_window_load(Window *window) {
   
   s_weather_conditions_layer = text_layer_create(GRect(0, 112, 36, 25));
   text_layer_set_background_color(s_weather_conditions_layer, GColorClear);
-  text_layer_set_text_color(s_weather_conditions_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_weather_conditions_layer, s_font_weather_icons);
   text_layer_set_text_alignment(s_weather_conditions_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_conditions_layer));
   
   s_weather_temp_layer = text_layer_create(GRect(0, 138, 36, 25));
   text_layer_set_background_color(s_weather_temp_layer, GColorClear);
-  text_layer_set_text_color(s_weather_temp_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_weather_temp_layer, s_font_small);
   text_layer_set_text_alignment(s_weather_temp_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_temp_layer));
@@ -268,28 +289,24 @@ static void main_window_load(Window *window) {
   
   s_forecast_0_day_layer = text_layer_create(GRect(36, 93, 36, 25));
   text_layer_set_background_color(s_forecast_0_day_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_0_day_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_0_day_layer, s_font_small_text);
   text_layer_set_text_alignment(s_forecast_0_day_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_0_day_layer));
   
   s_forecast_0_conditions_layer = text_layer_create(GRect(36, 114, 36, 25));
   text_layer_set_background_color(s_forecast_0_conditions_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_0_conditions_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_0_conditions_layer, s_font_weather_icons);
   text_layer_set_text_alignment(s_forecast_0_conditions_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_0_conditions_layer));
   
   s_forecast_0_max_layer = text_layer_create(GRect(36, 134, 36, 25));
   text_layer_set_background_color(s_forecast_0_max_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_0_max_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_0_max_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_0_max_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_0_max_layer));
   
   s_forecast_0_min_layer = text_layer_create(GRect(36, 149, 36, 25));
   text_layer_set_background_color(s_forecast_0_min_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_0_min_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_0_min_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_0_min_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_0_min_layer));
@@ -297,28 +314,24 @@ static void main_window_load(Window *window) {
   
   s_forecast_1_day_layer = text_layer_create(GRect(72, 93, 36, 25));
   text_layer_set_background_color(s_forecast_1_day_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_1_day_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_1_day_layer, s_font_small_text);
   text_layer_set_text_alignment(s_forecast_1_day_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_1_day_layer));
   
   s_forecast_1_conditions_layer = text_layer_create(GRect(72, 114, 36, 25));
   text_layer_set_background_color(s_forecast_1_conditions_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_1_conditions_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_1_conditions_layer, s_font_weather_icons);
   text_layer_set_text_alignment(s_forecast_1_conditions_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_1_conditions_layer));
   
   s_forecast_1_max_layer = text_layer_create(GRect(72, 134, 36, 25));
   text_layer_set_background_color(s_forecast_1_max_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_1_max_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_1_max_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_1_max_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_1_max_layer));
   
   s_forecast_1_min_layer = text_layer_create(GRect(72, 149, 36, 25));
   text_layer_set_background_color(s_forecast_1_min_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_1_min_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_1_min_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_1_min_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_1_min_layer));
@@ -326,33 +339,29 @@ static void main_window_load(Window *window) {
 
   s_forecast_2_day_layer = text_layer_create(GRect(108, 93, 36, 25));
   text_layer_set_background_color(s_forecast_2_day_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_2_day_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_2_day_layer, s_font_small_text);
   text_layer_set_text_alignment(s_forecast_2_day_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_2_day_layer));
 
   s_forecast_2_conditions_layer = text_layer_create(GRect(108, 114, 36, 25));
   text_layer_set_background_color(s_forecast_2_conditions_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_2_conditions_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_2_conditions_layer, s_font_weather_icons);
   text_layer_set_text_alignment(s_forecast_2_conditions_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_2_conditions_layer));
   
   s_forecast_2_max_layer = text_layer_create(GRect(108, 134, 36, 25));
   text_layer_set_background_color(s_forecast_2_max_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_2_max_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_2_max_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_2_max_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_2_max_layer));
   
   s_forecast_2_min_layer = text_layer_create(GRect(108, 149, 36, 25));
   text_layer_set_background_color(s_forecast_2_min_layer, GColorClear);
-  text_layer_set_text_color(s_forecast_2_min_layer, (GColor)COLOR_TEXT);
   text_layer_set_font(s_forecast_2_min_layer, s_font_small);
   text_layer_set_text_alignment(s_forecast_2_min_layer, GTextAlignmentCenter);
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_forecast_2_min_layer));
   
-  update_weather();
+  update_ui();
 }
 
 static void main_window_unload(Window *window) {
@@ -385,104 +394,85 @@ static void main_window_unload(Window *window) {
 
 static void _inbox_received_callback(DictionaryIterator *iterator, void *context) {
   Tuple *t = dict_read_first(iterator);
-  bool us_units = strcmp(i18n_get_system_locale(), "en_US") == 0;
 
   while(t != NULL) {
     switch(t->key) {
+      case KEY_TEMP_UNITS:
+        strcpy(s_temp_units, t->value->cstring);
+      break;
+      case KEY_BG_COLOR:
+        s_bg_color = t->value->uint8;
+      break;
+      case KEY_TEXT_COLOR:
+        s_text_color = t->value->uint8;
+      break;
+      
       case KEY_CITY:
         /*snprintf(s_city_buffer, sizeof(s_city_buffer), "%s", t->value->cstring);
         text_layer_set_text(s_city_layer, s_city_buffer);*/
       break;
       case KEY_WEATHER_TEMP_C:
-        if (!us_units) {
-          snprintf(s_weather_temp_buffer, sizeof(s_weather_temp_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_weather_temp_c_buffer, t->value->cstring, sizeof(s_weather_temp_c_buffer));
       break;
       case KEY_WEATHER_TEMP_F:
-        if (us_units) {
-          snprintf(s_weather_temp_buffer, sizeof(s_weather_temp_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_weather_temp_f_buffer, t->value->cstring, sizeof(s_weather_temp_f_buffer));
       break;
       case KEY_WEATHER_CONDITIONS:
-        snprintf(s_weather_conditions_buffer, sizeof(s_weather_conditions_buffer), "%s", t->value->cstring);
+        strncpy(s_weather_conditions_buffer, t->value->cstring, sizeof(s_weather_conditions_buffer));
       break;
       case KEY_FORECAST_0_DAY:
-        snprintf(s_forecast_0_day_buffer, sizeof(s_forecast_0_day_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_0_day_buffer, t->value->cstring, sizeof(s_forecast_0_day_buffer));
       break;
       case KEY_FORECAST_0_MIN_C:
-        if (!us_units) {
-          snprintf(s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_0_min_c_buffer, t->value->cstring, sizeof(s_forecast_0_min_c_buffer));
       break;
       case KEY_FORECAST_0_MIN_F:
-        if (us_units) {
-          snprintf(s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_0_min_f_buffer, t->value->cstring, sizeof(s_forecast_0_min_f_buffer));
       break;
       case KEY_FORECAST_0_MAX_C:
-        if (!us_units) {
-          snprintf(s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_0_max_c_buffer, t->value->cstring, sizeof(s_forecast_0_max_c_buffer));
       break;
       case KEY_FORECAST_0_MAX_F:
-        if (us_units) {
-          snprintf(s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_0_max_f_buffer, t->value->cstring, sizeof(s_forecast_0_max_f_buffer));
       break;
       case KEY_FORECAST_0_CONDITIONS:
-        snprintf(s_forecast_0_conditions_buffer, sizeof(s_forecast_0_conditions_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_0_conditions_buffer, t->value->cstring, sizeof(s_forecast_0_conditions_buffer));
       break;
       case KEY_FORECAST_1_DAY:
-        snprintf(s_forecast_1_day_buffer, sizeof(s_forecast_1_day_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_1_day_buffer, t->value->cstring, sizeof(s_forecast_1_day_buffer));
       break;
       case KEY_FORECAST_1_MIN_C:
-        if (!us_units) {
-          snprintf(s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_1_min_c_buffer, t->value->cstring, sizeof(s_forecast_1_min_c_buffer));
       break;
       case KEY_FORECAST_1_MIN_F:
-        if (us_units) {
-          snprintf(s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_1_min_f_buffer, t->value->cstring, sizeof(s_forecast_1_min_f_buffer));
       break;
       case KEY_FORECAST_1_MAX_C:
-        if (!us_units) {
-          snprintf(s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_1_max_c_buffer, t->value->cstring, sizeof(s_forecast_1_max_c_buffer));
       break;
       case KEY_FORECAST_1_MAX_F:
-        if (us_units) {
-          snprintf(s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_1_max_f_buffer, t->value->cstring, sizeof(s_forecast_1_max_f_buffer));
       break;
       case KEY_FORECAST_1_CONDITIONS:
-        snprintf(s_forecast_1_conditions_buffer, sizeof(s_forecast_1_conditions_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_1_conditions_buffer, t->value->cstring, sizeof(s_forecast_1_conditions_buffer));
       break;
       case KEY_FORECAST_2_DAY:
-        snprintf(s_forecast_2_day_buffer, sizeof(s_forecast_2_day_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_2_day_buffer, t->value->cstring, sizeof(s_forecast_2_day_buffer));
       break;
       case KEY_FORECAST_2_MIN_C:
-        if (!us_units) {
-          snprintf(s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_2_min_c_buffer, t->value->cstring, sizeof(s_forecast_2_min_c_buffer));
       break;
       case KEY_FORECAST_2_MIN_F:
-        if (us_units) {
-          snprintf(s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_2_min_f_buffer, t->value->cstring, sizeof(s_forecast_2_min_f_buffer));
       break;
       case KEY_FORECAST_2_MAX_C:
-        if (!us_units) {
-          snprintf(s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_2_max_c_buffer, t->value->cstring, sizeof(s_forecast_2_max_c_buffer));
       break;
       case KEY_FORECAST_2_MAX_F:
-        if (us_units) {
-          snprintf(s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer), "%s", t->value->cstring);
-        }
+        strncpy(s_forecast_2_max_f_buffer, t->value->cstring, sizeof(s_forecast_2_max_f_buffer));
       break;
       case KEY_FORECAST_2_CONDITIONS:
-        snprintf(s_forecast_2_conditions_buffer, sizeof(s_forecast_2_conditions_buffer), "%s", t->value->cstring);
+        strncpy(s_forecast_2_conditions_buffer, t->value->cstring, sizeof(s_forecast_2_conditions_buffer));
       break;
       default:
         APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);
@@ -492,7 +482,7 @@ static void _inbox_received_callback(DictionaryIterator *iterator, void *context
     t = dict_read_next(iterator);
   }
   
-  update_weather();
+  update_ui();
 }
 
 static time_t s_poll_last_action = 0;
@@ -550,17 +540,6 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 static void init() {
-  s_main_window = window_create();
-  window_set_window_handlers(s_main_window, (WindowHandlers) {
-    .load = main_window_load,
-    .unload = main_window_unload
-  });
-  window_stack_push(s_main_window, true);
-  
-  time_t t = time(NULL);
-  update_time(localtime(&t));
-  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-  
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
   app_message_register_outbox_failed(outbox_failed_callback);
@@ -573,24 +552,55 @@ static void init() {
   #endif*/
   
   s_poll_last_received = persist_exists(KEY_POLL_LAST_RECEIVED) ? persist_read_int(KEY_POLL_LAST_RECEIVED) : 0;
-  if (persist_exists(KEY_WEATHER_TEMP)) {
-    persist_read_string(KEY_WEATHER_TEMP, s_weather_temp_buffer, sizeof(s_weather_temp_buffer));
+  if (persist_exists(KEY_WEATHER_TEMP_C)) {
+    persist_read_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer, sizeof(s_weather_temp_c_buffer));
+    persist_read_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer, sizeof(s_weather_temp_f_buffer));
     persist_read_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer, sizeof(s_weather_conditions_buffer));
     persist_read_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer, sizeof(s_forecast_0_day_buffer));
-    persist_read_string(KEY_FORECAST_0_MIN, s_forecast_0_min_buffer, sizeof(s_forecast_0_min_buffer));
-    persist_read_string(KEY_FORECAST_0_MAX, s_forecast_0_max_buffer, sizeof(s_forecast_0_max_buffer));
+    persist_read_string(KEY_FORECAST_0_MIN_C, s_forecast_0_min_c_buffer, sizeof(s_forecast_0_min_c_buffer));
+    persist_read_string(KEY_FORECAST_0_MIN_F, s_forecast_0_min_f_buffer, sizeof(s_forecast_0_min_f_buffer));
+    persist_read_string(KEY_FORECAST_0_MAX_C, s_forecast_0_max_c_buffer, sizeof(s_forecast_0_max_c_buffer));
+    persist_read_string(KEY_FORECAST_0_MAX_F, s_forecast_0_max_f_buffer, sizeof(s_forecast_0_max_f_buffer));
     persist_read_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer, sizeof(s_forecast_0_conditions_buffer));
     persist_read_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer, sizeof(s_forecast_1_day_buffer));
-    persist_read_string(KEY_FORECAST_1_MIN, s_forecast_1_min_buffer, sizeof(s_forecast_1_min_buffer));
-    persist_read_string(KEY_FORECAST_1_MAX, s_forecast_1_max_buffer, sizeof(s_forecast_1_max_buffer));
+    persist_read_string(KEY_FORECAST_1_MIN_C, s_forecast_1_min_c_buffer, sizeof(s_forecast_1_min_c_buffer));
+    persist_read_string(KEY_FORECAST_1_MIN_F, s_forecast_1_min_f_buffer, sizeof(s_forecast_1_min_f_buffer));
+    persist_read_string(KEY_FORECAST_1_MAX_C, s_forecast_1_max_c_buffer, sizeof(s_forecast_1_max_c_buffer));
+    persist_read_string(KEY_FORECAST_1_MAX_F, s_forecast_1_max_f_buffer, sizeof(s_forecast_1_max_f_buffer));
     persist_read_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer, sizeof(s_forecast_1_conditions_buffer));
     persist_read_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer, sizeof(s_forecast_2_day_buffer));
-    persist_read_string(KEY_FORECAST_2_MIN, s_forecast_2_min_buffer, sizeof(s_forecast_2_min_buffer));
-    persist_read_string(KEY_FORECAST_2_MAX, s_forecast_2_max_buffer, sizeof(s_forecast_2_max_buffer));
+    persist_read_string(KEY_FORECAST_2_MIN_C, s_forecast_2_min_c_buffer, sizeof(s_forecast_2_min_c_buffer));
+    persist_read_string(KEY_FORECAST_2_MIN_F, s_forecast_2_min_f_buffer, sizeof(s_forecast_2_min_f_buffer));
+    persist_read_string(KEY_FORECAST_2_MAX_C, s_forecast_2_max_c_buffer, sizeof(s_forecast_2_max_c_buffer));
+    persist_read_string(KEY_FORECAST_2_MAX_F, s_forecast_2_max_f_buffer, sizeof(s_forecast_2_max_f_buffer));
     persist_read_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer, sizeof(s_forecast_2_conditions_buffer));
+    
+    persist_read_string(KEY_TEMP_UNITS, s_temp_units, sizeof(s_temp_units));
+    s_bg_color = persist_read_int(KEY_BG_COLOR);
+    s_text_color = persist_read_int(KEY_TEXT_COLOR);
+    
+    #ifndef PBL_COLOR
+      if (( s_text_color != GColorWhiteARGB8 && s_text_color != GColorBlackARGB8 ) ||
+          ( s_bg_color != GColorWhiteARGB8 && s_bg_color != GColorBlackARGB8 )) {
+        s_text_color = GColorWhiteARGB8;
+        s_bg_color = GColorBlackARGB8;
+      }
+    #endif
   } else {
     request_poll();
+    strcpy(s_temp_units, strcmp(i18n_get_system_locale(), "en_US") ? "f" : "c");
   }
+  
+  s_main_window = window_create();
+  window_set_window_handlers(s_main_window, (WindowHandlers) {
+    .load = main_window_load,
+    .unload = main_window_unload
+  });
+  window_stack_push(s_main_window, true);
+  
+  time_t t = time(NULL);
+  update_time(localtime(&t));
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 }
 
 static void deinit() {
@@ -604,20 +614,34 @@ static void deinit() {
   if (s_poll_last_received != stored_poll_last_received) {
     persist_write_int(KEY_POLL_LAST_RECEIVED, s_poll_last_received);
     
-    persist_write_string(KEY_WEATHER_TEMP, s_weather_temp_buffer);
+    persist_write_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer);
+    persist_write_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer);
     persist_write_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer);
     persist_write_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer);
-    persist_write_string(KEY_FORECAST_0_MIN, s_forecast_0_min_buffer);
-    persist_write_string(KEY_FORECAST_0_MAX, s_forecast_0_max_buffer);
+    persist_write_string(KEY_FORECAST_0_MIN_C, s_forecast_0_min_c_buffer);
+    persist_write_string(KEY_FORECAST_0_MIN_F, s_forecast_0_min_f_buffer);
+    persist_write_string(KEY_FORECAST_0_MAX_C, s_forecast_0_max_c_buffer);
+    persist_write_string(KEY_FORECAST_0_MAX_F, s_forecast_0_max_f_buffer);
     persist_write_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer);
     persist_write_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer);
-    persist_write_string(KEY_FORECAST_1_MIN, s_forecast_1_min_buffer);
-    persist_write_string(KEY_FORECAST_1_MAX, s_forecast_1_max_buffer);
+    persist_write_string(KEY_FORECAST_1_MIN_C, s_forecast_1_min_c_buffer);
+    persist_write_string(KEY_FORECAST_1_MIN_F, s_forecast_1_min_f_buffer);
+    persist_write_string(KEY_FORECAST_1_MAX_C, s_forecast_1_max_c_buffer);
+    persist_write_string(KEY_FORECAST_1_MAX_F, s_forecast_1_max_f_buffer);
     persist_write_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer);
     persist_write_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer);
-    persist_write_string(KEY_FORECAST_2_MIN, s_forecast_2_min_buffer);
-    persist_write_string(KEY_FORECAST_2_MAX, s_forecast_2_max_buffer);
+    persist_write_string(KEY_FORECAST_2_MIN_C, s_forecast_2_min_c_buffer);
+    persist_write_string(KEY_FORECAST_2_MIN_F, s_forecast_2_min_f_buffer);
+    persist_write_string(KEY_FORECAST_2_MAX_C, s_forecast_2_max_c_buffer);
+    persist_write_string(KEY_FORECAST_2_MAX_F, s_forecast_2_max_f_buffer);
     persist_write_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer);
+  }
+  
+  int stored_bg_color = persist_exists(KEY_BG_COLOR) ? persist_read_int(KEY_BG_COLOR) : 0;
+  if (s_bg_color != stored_bg_color) {
+    persist_write_string(KEY_TEMP_UNITS, s_temp_units);
+    persist_write_int(KEY_BG_COLOR, s_bg_color);
+    persist_write_int(KEY_TEXT_COLOR, s_text_color);
   }
 }
 

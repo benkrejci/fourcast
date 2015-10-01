@@ -1,7 +1,40 @@
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
-  Pebble.openURL('http://benkrejci.com/fourcast/config.html');
+  var configJson = localStorage.config && localStorage.config != '{}' ?
+                     localStorage.config
+                   : '{"bg_color":"000000","text_color":"ffffff"}';
+  Pebble.openURL('http://benkrejci.com/fourcast/config.html#' + encodeURIComponent(configJson));
 });
+
+Pebble.addEventListener('webviewclosed', function (e) {
+  var configJson = decodeURIComponent(e.response);
+  if (!configJson || configJson == '{}') return;
+  localStorage.config = configJson;
+  sendConfigData();
+});
+
+Pebble.addEventListener('ready', function (e) { sendConfigData(); });
+
+function hexToGColor(hex) {
+  var hexNum = parseInt(hex, 16);
+  var a = 192;
+  var r = (((hexNum >> 16) & 0xFF) >> 6) << 4;
+  var g = (((hexNum >>  8) & 0xFF) >> 6) << 2;
+  var b = (((hexNum >>  0) & 0xFF) >> 6) << 0;
+  return a + r + g + b;
+}
+
+function sendConfigData() {
+  var configJson = localStorage.config;
+  if (!configJson) return;
+  var config = JSON.parse(configJson);
+  var dict = {
+    'KEY_TEMP_UNITS': config.temp_units,
+    'KEY_BG_COLOR': hexToGColor(config.bg_color),
+    'KEY_TEXT_COLOR': hexToGColor(config.text_color)
+  };
+  Pebble.sendAppMessage(dict, function (e) {}, function (e) {console.error('error sending config data to Pebble: ' + e);});
+}
 
 var RETRIES = 3;
 var RETRY_PAUSE = 5 * 1000;
@@ -105,7 +138,7 @@ function locationSuccess(pos) {
           appData['KEY_FORECAST_' + i + '_CONDITIONS'] = getWeatherIcon(data.weather[0], false);
           appData['KEY_FORECAST_' + i + '_DAY'] = DAYS_ABBR[(new Date(data.dt * 1000)).getDay()];
         });
-        Pebble.sendAppMessage(appData, function (e) {}, function (e) {console.error('error requesting forecast!');});
+        Pebble.sendAppMessage(appData, function (e) {}, function (e) {console.error('error sending weather data to Pebble: ' + e);});
       });
     }, function (e) {console.error('error requesting current weather!');});
   });
@@ -123,17 +156,7 @@ function getWeather() {
   );
 }
 
-/*Pebble.addEventListener('ready', 
-  function(e) {
-    getWeather();
-  }
-);*/
-
-Pebble.addEventListener('appmessage',
-  function(e) {
-    getWeather();
-  }                     
-);
+Pebble.addEventListener('appmessage', function (e) { getWeather(); });
 
 WEATHER_ICONS = {
   "": "?",
