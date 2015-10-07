@@ -1,8 +1,6 @@
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
-  var configJson = localStorage.config && localStorage.config != '{}' ?
-                     localStorage.config
-                   : '{"bg_color":"000000","text_color":"ffffff"}';
+  var configJson = localStorage.config;
   Pebble.openURL('http://benkrejci.com/fourcast/config.html#' + encodeURIComponent(configJson));
 });
 
@@ -13,15 +11,23 @@ Pebble.addEventListener('webviewclosed', function (e) {
   sendConfigData();
 });
 
-Pebble.addEventListener('ready', function (e) { sendConfigData(); });
+/*Pebble.addEventListener('ready', function (e) { sendConfigData(); });*/
 
 function hexToGColor(hex) {
   var hexNum = parseInt(hex, 16);
-  var a = 192;
-  var r = (((hexNum >> 16) & 0xFF) >> 6) << 4;
-  var g = (((hexNum >>  8) & 0xFF) >> 6) << 2;
-  var b = (((hexNum >>  0) & 0xFF) >> 6) << 0;
-  return a + r + g + b;
+  return (                0xFF >> 6 << 6 ) + // a
+         ( hexNum >> 16 & 0xFF >> 6 << 4 ) + // r
+         ( hexNum >>  8 & 0xFF >> 6 << 2 ) + // g
+         ( hexNum       & 0xFF >> 6      );  // b
+}
+
+function gColorToHex(gColor) {
+  return ( '000000' +
+           ( ( ( gColor >> 4 & 0b11 ) * 0xff / 0b11 << 16 ) +
+             ( ( gColor >> 2 & 0b11 ) * 0xff / 0b11 << 8  ) +
+             ( ( gColor >> 0 & 0b11 ) * 0xff / 0b11       ) )
+             .toString(16) )
+           .slice(-6);
 }
 
 function sendConfigData() {
@@ -152,11 +158,29 @@ function getWeather() {
   navigator.geolocation.getCurrentPosition(
     locationSuccess,
     locationError,
-    {timeout: 15000, maximumAge: 60000}
+    { enableHighAccuracy: false,
+      timeout: 60 * 1000,
+      maximumAge: 15 * 60 * 1000 }
   );
 }
 
-Pebble.addEventListener('appmessage', function (e) { getWeather(); });
+Pebble.addEventListener('appmessage', function (e) {
+  console.log(JSON.stringify(e.payload));
+  if (e.payload.KEY_ACTION_STORE_SETTINGS) {
+    localStorage.config = JSON.stringify({
+      temp_units: e.payload.KEY_TEMP_UNITS,
+      bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
+      text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
+    });
+    console.log('-1 >> ' + gColorToHex(-1));
+    console.log('store_settings: ' + localStorage.config);
+  }
+  
+  if (e.payload.KEY_ACTION_GET_WEATHER) {
+    getWeather();
+    console.log('get_weather');
+  }
+});
 
 WEATHER_ICONS = {
   "": "?",

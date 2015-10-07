@@ -1,8 +1,8 @@
 #include <pebble.h>
 
+const int OUTBOX_SEND_MAX_TRIES = 6;
 const int WEATHER_UPDATE_MINUTES = 30;
-const int POLL_MAX_TRIES = 6;
-const int POLL_TIMEOUT = 30;
+const int GET_WEATHER_TIMEOUT = 30;
 const int TIME_SIZE = 6;
 const char TIME_FORMAT_24HR[] = "%k:%M";
 const char TIME_FORMAT_12HR[] = "%l:%M";
@@ -53,7 +53,9 @@ enum {
   KEY_BG_COLOR = 23,
   KEY_TEXT_COLOR = 24,
   
-  KEY_POLL_LAST_RECEIVED = 25
+  KEY_GET_WEATHER_LAST_RECEIVED = 25,
+  KEY_ACTION_STORE_SETTINGS = 26,
+  KEY_ACTION_GET_WEATHER = 27
 };
 
 static char s_temp_units[] = "f";
@@ -392,8 +394,9 @@ static void main_window_unload(Window *window) {
   fonts_unload_custom_font(s_font_small_text);
 }
 
-static void _inbox_received_callback(DictionaryIterator *iterator, void *context) {
+static bool _inbox_received_callback(DictionaryIterator *iterator, void *context) {
   Tuple *t = dict_read_first(iterator);
+  bool received_weather = false;
 
   while(t != NULL) {
     switch(t->key) {
@@ -412,6 +415,7 @@ static void _inbox_received_callback(DictionaryIterator *iterator, void *context
         text_layer_set_text(s_city_layer, s_city_buffer);*/
       break;
       case KEY_WEATHER_TEMP_C:
+        received_weather = true;
         strncpy(s_weather_temp_c_buffer, t->value->cstring, sizeof(s_weather_temp_c_buffer));
       break;
       case KEY_WEATHER_TEMP_F:
@@ -483,59 +487,93 @@ static void _inbox_received_callback(DictionaryIterator *iterator, void *context
   }
   
   update_ui();
+  
+  return received_weather;
 }
 
-static time_t s_poll_last_action = 0;
-static int s_poll_current_try = 0;
-static int s_poll_last_received = 0;
+static int s_outbox_send_current_try = 0;
+static time_t s_outbox_send_last_action = 0;
+static int s_get_weather_last_received = 0;
+static uint8_t s_action_store_settings = 0;
+static uint8_t s_action_get_weather = 0;
 
-static void _request_poll() {
+static void outbox_send() {
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
-  dict_write_uint8(iter, 0, 0);
+  //APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send");
+  if (s_action_store_settings) {
+    //APP_LOG(APP_LOG_LEVEL_INFO, "  s_action_store_settings");
+    dict_write_uint8(iter, KEY_ACTION_STORE_SETTINGS, s_action_store_settings);
+    dict_write_cstring(iter, KEY_TEMP_UNITS, s_temp_units);
+    dict_write_uint8(iter, KEY_BG_COLOR, s_bg_color);
+    dict_write_uint8(iter, KEY_TEXT_COLOR, s_text_color);
+  }
+  
+  if (s_action_get_weather) {
+    //APP_LOG(APP_LOG_LEVEL_INFO, "  s_action_get_weather");
+    dict_write_uint8(iter, KEY_ACTION_GET_WEATHER, s_action_get_weather);
+  }
+  
   app_message_outbox_send();
 }
 
-static void request_poll() {
+static void store_settings() {
+  //APP_LOG(APP_LOG_LEVEL_INFO, "store_settings()");
+  s_action_store_settings = 1;
+  s_action_get_weather = 0;
+  outbox_send();
+}
+
+static void _get_weather() {
+  //APP_LOG(APP_LOG_LEVEL_INFO, "_get_weather()");
+  s_action_store_settings = 1;
+  s_action_get_weather = 1;
+  outbox_send();
+}
+
+static void get_weather() {
   time_t current_time = time(NULL);
-  if (current_time - s_poll_last_action > POLL_TIMEOUT) {
-    s_poll_last_action = current_time;
-    s_poll_current_try = 0;
-    _request_poll();
+  if (current_time - s_outbox_send_last_action > GET_WEATHER_TIMEOUT) {
+    s_outbox_send_last_action = current_time;
+    s_outbox_send_current_try = 0;
+    get_weather();
   }
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
-  s_poll_last_action = time(NULL);
+  //APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+  s_action_get_weather = 0;
+  s_action_store_settings = 0;
+  s_outbox_send_last_action = time(NULL);
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-  s_poll_current_try++;
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed: %d (try %d/%d)", reason, s_poll_current_try, POLL_MAX_TRIES);
-  if (s_poll_current_try < POLL_MAX_TRIES) {
-    _request_poll();
+  s_outbox_send_current_try++;
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed: %d (try %d/%d)", reason, s_outbox_send_current_try, OUTBOX_SEND_MAX_TRIES);
+  if (s_outbox_send_current_try < OUTBOX_SEND_MAX_TRIES) {
+    outbox_send();
   } else {
-    s_poll_last_action = 0;
+    s_outbox_send_last_action = 0;
   }
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  _inbox_received_callback(iterator, context);
-  s_poll_last_action = 0;
-  s_poll_last_received = (int)time(NULL);
+  //APP_LOG(APP_LOG_LEVEL_INFO, "Inbox receive success!");
+  if (_inbox_received_callback(iterator, context)) {
+    s_get_weather_last_received = (int)time(NULL);
+  }
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped: %d", reason);
+  //APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped: %d", reason);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time(tick_time);
   
   int now = (int)time(NULL);
-  if (now - s_poll_last_received >= WEATHER_UPDATE_MINUTES * 60) {
-    request_poll();
+  if (now - s_get_weather_last_received >= WEATHER_UPDATE_MINUTES * 60) {
+    get_weather();
   }
 }
 
@@ -551,7 +589,7 @@ static void init() {
     accel_tap_service_subscribe(tap_handler);
   #endif*/
   
-  s_poll_last_received = persist_exists(KEY_POLL_LAST_RECEIVED) ? persist_read_int(KEY_POLL_LAST_RECEIVED) : 0;
+  s_get_weather_last_received = persist_exists(KEY_GET_WEATHER_LAST_RECEIVED) ? persist_read_int(KEY_GET_WEATHER_LAST_RECEIVED) : 0;
   if (persist_exists(KEY_WEATHER_TEMP_C)) {
     persist_read_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer, sizeof(s_weather_temp_c_buffer));
     persist_read_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer, sizeof(s_weather_temp_f_buffer));
@@ -586,8 +624,10 @@ static void init() {
         s_bg_color = GColorBlackARGB8;
       }
     #endif
+      
+    store_settings();
   } else {
-    request_poll();
+    get_weather();
     strcpy(s_temp_units, strcmp(i18n_get_system_locale(), "en_US") ? "f" : "c");
   }
   
@@ -610,9 +650,9 @@ static void deinit() {
     accel_tap_service_unsubscribe();
   #endif*/
   
-  int stored_poll_last_received = persist_exists(KEY_POLL_LAST_RECEIVED) ? persist_read_int(KEY_POLL_LAST_RECEIVED) : 0;
-  if (s_poll_last_received != stored_poll_last_received) {
-    persist_write_int(KEY_POLL_LAST_RECEIVED, s_poll_last_received);
+  int stored_get_weather_last_received = persist_exists(KEY_GET_WEATHER_LAST_RECEIVED) ? persist_read_int(KEY_GET_WEATHER_LAST_RECEIVED) : 0;
+  if (s_get_weather_last_received != stored_get_weather_last_received) {
+    persist_write_int(KEY_GET_WEATHER_LAST_RECEIVED, s_get_weather_last_received);
     
     persist_write_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer);
     persist_write_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer);

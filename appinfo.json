@@ -1,5 +1,7 @@
 {
     "appKeys": {
+        "KEY_ACTION_GET_WEATHER": 27,
+        "KEY_ACTION_STORE_SETTINGS": 26,
         "KEY_BG_COLOR": 23,
         "KEY_CITY": 21,
         "KEY_FORECAST_0_CONDITIONS": 8,
@@ -71,7 +73,7 @@
         "basalt"
     ],
     "uuid": "7a7c8159-2036-44b3-b92b-182ddc9ef8de",
-    "versionLabel": "0.2",
+    "versionLabel": "0.3",
     "watchapp": {
         "watchface": true
     }
