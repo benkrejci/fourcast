@@ -2,7 +2,7 @@
 <html><head>
   <meta HTTP-EQUIV="Pragma" CONTENT="no-cache">
   <meta HTTP-EQUIV="Expires" CONTENT="-1">
-  <title>Fourcast Configuration</title>
+  <title>Fourcast Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
   <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
@@ -14,6 +14,13 @@
   var $fields;
 
   function load() {
+    if (data.supports_color) {
+      $('.not-supports-color').remove();
+    } else {
+      $('.supports-color').remove();
+      data.inverted = data.bg_color == '000000' ? '1' : '0';
+    }
+
     $fields.each(function () {
       var $field = $(this);
       var $input = $field.find('input');
@@ -31,7 +38,7 @@
   }
 
   function save() {
-    data = {};
+    data = data || {};
     $fields.each(function () {
       var $field = $(this);
       var $input = $field.find('input');
@@ -41,7 +48,16 @@
       else
         data[name] = $field.val();
     });
-    alert(JSON.stringify(data));
+
+    if (!data.supports_color)
+      if (data.inverted == '1') {
+        data.bg_color = '000000';
+        data.text_color = 'ffffff';
+      } else {
+        data.bg_color = 'ffffff';
+        data.text_color = '000000';
+      }
+    delete data.inverted;
   }
 
   function close() {
@@ -111,17 +127,23 @@
 
     try {
       data = JSON.parse( decodeURIComponent( location.hash.substring(1) ) );
-      load();
     } catch (e) {
       data = {};
     }
+    load();
   });
 })()
   </script>
+  <style>
+.ui-field-contain .ui-controlgroup,
+.ui-field-contain fieldset.ui-controlgroup {
+  margin: 1em 0;
+}
+  </style>
 </head><body>
   <div data-role="page">
     <div data-role="header">
-      <h1>Fourcast Config</h1>
+      <h1>Fourcast Settings</h1>
       <a href="pebblejs://close" class="ui-btn ui-btn-left" id="cancel">Cancel</a>
       <a href="pebblejs://close" class="ui-btn ui-btn-right" id="done">Done</a>
     </div>
@@ -136,14 +158,26 @@
           <label for="temp_units_c">&deg;C</label>
         </fieldset>
 
-        <div class="ui-field-contain">
-          <label for="bg_color">Background Color</label>
-          <input type="text" name="bg_color" id="bg_color" class="field color-picker" />
+        <div class="supports-color">
+          <div class="ui-field-contain">
+            <label for="bg_color">Background Color</label>
+            <input type="text" name="bg_color" id="bg_color" class="field color-picker" />
+          </div>
+
+          <div class="ui-field-contain">
+            <label for="text_color">Text Color</label>
+            <input type="text" name="text_color" id="text_color" class="field color-picker" />
+          </div>
         </div>
 
-        <div class="ui-field-contain">
-          <label for="text_color">Text Color</label>
-          <input type="text" name="text_color" id="text_color" class="field color-picker" />
+        <div class="not-supports-color">
+          <fieldset data-role="controlgroup" data-type="horizontal" class="field ui-field-contain">
+            <legend>Color Scheme</legend>
+            <input type="radio" name="inverted" id="inverted_0" value="0">
+            <label for="inverted_0">Regular</label>
+            <input type="radio" name="inverted" id="inverted_1" value="1">
+            <label for="inverted_1">Inverted</label>
+          </fieldset>
         </div>
       </div>
     </div>
