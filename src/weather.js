@@ -11,24 +11,22 @@ Pebble.addEventListener('webviewclosed', function (e) {
   sendConfigData();
 });
 
+Pebble.addEventListener('appmessage', function (e) {
+  if (e.payload.KEY_ACTION_STORE_SETTINGS) {
+    localStorage.config = JSON.stringify({
+      supports_color: !!e.payload.KEY_SUPPORTS_COLOR,
+      temp_units: e.payload.KEY_TEMP_UNITS,
+      bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
+      text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
+    });
+  }
+  
+  if (e.payload.KEY_ACTION_GET_WEATHER) {
+    getWeather();
+  }
+});
+
 /*Pebble.addEventListener('ready', function (e) { sendConfigData(); });*/
-
-function hexToGColor(hex) {
-  var hexNum = parseInt(hex, 16);
-  return (                0xFF >> 6 << 6 ) + // a
-         ( hexNum >> 16 & 0xFF >> 6 << 4 ) + // r
-         ( hexNum >>  8 & 0xFF >> 6 << 2 ) + // g
-         ( hexNum       & 0xFF >> 6      );  // b
-}
-
-function gColorToHex(gColor) {
-  return ( '000000' +
-           ( ( ( gColor >> 4 & 0b11 ) * 0xff / 0b11 << 16 ) +
-             ( ( gColor >> 2 & 0b11 ) * 0xff / 0b11 << 8  ) +
-             ( ( gColor >> 0 & 0b11 ) * 0xff / 0b11       ) )
-             .toString(16) )
-           .slice(-6);
-}
 
 function sendConfigData() {
   var configJson = localStorage.config;
@@ -42,65 +40,19 @@ function sendConfigData() {
   Pebble.sendAppMessage(dict, function (e) {}, function (e) {console.error('error sending config data to Pebble: ' + e);});
 }
 
-var RETRIES = 3;
-var RETRY_PAUSE = 5 * 1000;
-var xhrRequest = function (url, type, callback, retry) {
-  retry = retry || 0;
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
-    try {
-      if (!this.responseText) throw new Error('No data!');
-      callback(this.responseText);
-    } catch (e) {
-      if (retry < RETRIES) {
-        setTimeout(function () {
-          xhrRequest(url, type, callback, retry + 1);
-        }, RETRY_PAUSE);
-      } else {
-        console.error('XMLHttpRequest failed ' + ( retry + 1 ) + ' times: ' + String(e));
-      }
-    }
-  };
-  xhr.open(type, url);
-  xhr.send();
-};
-
-function KtoC(k) {
-  return k - 273.15;
-}
-  
-function CtoF(c) {
-  return c * 9 / 5 + 32;
-}
-  
-function round(x) {
-  return x != null && String(x).replace(/\..*$/,'');
+function getWeather() {
+  navigator.geolocation.getCurrentPosition(
+    locationSuccess,
+    locationError,
+    { enableHighAccuracy: false,
+      timeout: 60 * 1000,
+      maximumAge: 15 * 60 * 1000 }
+  );
 }
 
-var DAYS_ABBR = [
-  'Sun',
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat'
-];
-var WEATHER_ICONS;
-var TODAYS_FORECAST_HOURS_CUTOFF = 15;
-var sunrise, sunset;
-
-var getWeatherIcon = function (weatherInfo, isNight) {
-  var date = new Date();
-  isNight = isNight == null ?
-              ( +date < +sunrise || sunrise.getDay() > date.getDay() ) ||
-              ( +date > +sunset  || sunset.getDay()  > date.getDay() )
-            : isNight;
-  if (!weatherInfo) return '';
-  var icon;
-  if (isNight) icon = WEATHER_ICONS[weatherInfo.id + '-n'];
-  return icon || WEATHER_ICONS[weatherInfo.id];
-};
+function locationError(err) {
+  console.log('error requesting location!');
+}
 
 function locationSuccess(pos) {
   var locationArgs = 'lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude;
@@ -150,37 +102,82 @@ function locationSuccess(pos) {
   });
 }
 
-function locationError(err) {
-  console.log('error requesting location!');
-}
+var RETRIES = 3;
+var RETRY_PAUSE = 5 * 1000;
+function xhrRequest(url, type, callback, retry) {
+  retry = retry || 0;
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function () {
+    try {
+      if (!this.responseText) throw new Error('No data!');
+      callback(this.responseText);
+    } catch (e) {
+      if (retry < RETRIES) {
+        setTimeout(function () {
+          xhrRequest(url, type, callback, retry + 1);
+        }, RETRY_PAUSE);
+      } else {
+        console.error('XMLHttpRequest failed ' + ( retry + 1 ) + ' times: ' + String(e));
+      }
+    }
+  };
+  xhr.open(type, url);
+  xhr.send();
+};
 
-function getWeather() {
-  navigator.geolocation.getCurrentPosition(
-    locationSuccess,
-    locationError,
-    { enableHighAccuracy: false,
-      timeout: 60 * 1000,
-      maximumAge: 15 * 60 * 1000 }
-  );
+function KtoC(k) {
+  return k - 273.15;
 }
-
-Pebble.addEventListener('appmessage', function (e) {
-  console.log(JSON.stringify(e.payload));
-  if (e.payload.KEY_ACTION_STORE_SETTINGS) {
-    localStorage.config = JSON.stringify({
-      temp_units: e.payload.KEY_TEMP_UNITS,
-      bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
-      text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
-    });
-    console.log('-1 >> ' + gColorToHex(-1));
-    console.log('store_settings: ' + localStorage.config);
-  }
   
-  if (e.payload.KEY_ACTION_GET_WEATHER) {
-    getWeather();
-    console.log('get_weather');
-  }
-});
+function CtoF(c) {
+  return c * 9 / 5 + 32;
+}
+  
+function round(x) {
+  return x != null && String(x).replace(/\..*$/,'');
+}
+
+function hexToGColor(hex) {
+  var hexNum = parseInt(hex, 16);
+  return (                0xFF >> 6 << 6 ) + // a
+         ( hexNum >> 16 & 0xFF >> 6 << 4 ) + // r
+         ( hexNum >>  8 & 0xFF >> 6 << 2 ) + // g
+         ( hexNum       & 0xFF >> 6      );  // b
+}
+
+function gColorToHex(gColor) {
+  return ( '000000' +
+           ( ( ( gColor >> 4 & 0b11 ) * 0xff / 0b11 << 16 ) +
+             ( ( gColor >> 2 & 0b11 ) * 0xff / 0b11 << 8  ) +
+             ( ( gColor >> 0 & 0b11 ) * 0xff / 0b11       ) )
+             .toString(16) )
+           .slice(-6);
+}
+
+var DAYS_ABBR = [
+  'Sun',
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat'
+];
+var WEATHER_ICONS;
+var TODAYS_FORECAST_HOURS_CUTOFF = 15;
+var sunrise, sunset;
+
+function getWeatherIcon(weatherInfo, isNight) {
+  var date = new Date();
+  isNight = isNight == null ?
+              ( +date < +sunrise || sunrise.getDay() > date.getDay() ) ||
+              ( +date > +sunset  || sunset.getDay()  > date.getDay() )
+            : isNight;
+  if (!weatherInfo) return '';
+  var icon;
+  if (isNight) icon = WEATHER_ICONS[weatherInfo.id + '-n'];
+  return icon || WEATHER_ICONS[weatherInfo.id];
+};
 
 WEATHER_ICONS = {
   "": "?",

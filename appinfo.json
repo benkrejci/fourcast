@@ -22,6 +22,7 @@
         "KEY_FORECAST_2_MAX_F": 19,
         "KEY_FORECAST_2_MIN_C": 16,
         "KEY_FORECAST_2_MIN_F": 17,
+        "KEY_SUPPORTS_COLOR": 28,
         "KEY_TEMP_UNITS": 22,
         "KEY_TEXT_COLOR": 24,
         "KEY_WEATHER_CONDITIONS": 2,
@@ -38,12 +39,6 @@
     "resources": {
         "media": [
             {
-                "file": "images/fourcast 1.png",
-                "menuIcon": true,
-                "name": "PREVIEW",
-                "type": "png"
-            },
-            {
                 "file": "fonts/Square.ttf",
                 "name": "SQUARE_18",
                 "type": "font"
@@ -54,14 +49,20 @@
                 "type": "font"
             },
             {
-                "file": "fonts/Anita semi square.ttf",
-                "name": "SQUARE_TEXT_22",
-                "trackingAdjust": -1,
-                "type": "font"
+                "file": "images/fourcast 1.png",
+                "menuIcon": true,
+                "name": "PREVIEW",
+                "type": "png"
             },
             {
                 "file": "fonts/owfont-regular.ttf",
                 "name": "WEATHER_ICONS_26",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Anita semi square.ttf",
+                "name": "SQUARE_TEXT_22",
+                "trackingAdjust": -1,
                 "type": "font"
             }
         ]

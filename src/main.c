@@ -14,11 +14,13 @@ const char DAY_FORMAT[] = "%a";*/
 #define GColorWhiteARGB8 ((uint8_t)0b11111111)
 #define GColorBlackARGB8 ((uint8_t)0b11000000)
 #ifdef PBL_COLOR
+  #define supports_color true
   #define COLOR_BATT ((uint8_t)GColorWhiteARGB8)
   #define COLOR_BATT_LOW ((uint8_t)GColorRedARGB8)
   #define COLOR_BG ((uint8_t)GColorBlackARGB8)
   #define COLOR_TEXT ((uint8_t)GColorWhiteARGB8)
 #else
+  #define supports_color false
   #define COLOR_BATT ((uint8_t)GColorWhiteARGB8)
   #define COLOR_BATT_LOW ((uint8_t)COLOR_BATT)
   #define COLOR_BG ((uint8_t)GColorBlackARGB8)
@@ -55,7 +57,8 @@ enum {
   
   KEY_GET_WEATHER_LAST_RECEIVED = 25,
   KEY_ACTION_STORE_SETTINGS = 26,
-  KEY_ACTION_GET_WEATHER = 27
+  KEY_ACTION_GET_WEATHER = 27,
+  KEY_SUPPORTS_COLOR = 28
 };
 
 static char s_temp_units[] = "f";
@@ -504,6 +507,7 @@ static void outbox_send() {
   if (s_action_store_settings) {
     //APP_LOG(APP_LOG_LEVEL_INFO, "  s_action_store_settings");
     dict_write_uint8(iter, KEY_ACTION_STORE_SETTINGS, s_action_store_settings);
+    dict_write_uint8(iter, KEY_SUPPORTS_COLOR, supports_color ? 1 : 0);
     dict_write_cstring(iter, KEY_TEMP_UNITS, s_temp_units);
     dict_write_uint8(iter, KEY_BG_COLOR, s_bg_color);
     dict_write_uint8(iter, KEY_TEXT_COLOR, s_text_color);
