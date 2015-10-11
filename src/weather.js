@@ -1,3 +1,6 @@
+var TODAYS_FORECAST_HOURS_CUTOFF = 15; // 3:00 PM
+var OPENWEATHERMAP_API_KEY = '746ca9a1c69c304bec844202dd4a501e';
+
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
   var configJson = localStorage.config;
@@ -19,9 +22,11 @@ Pebble.addEventListener('appmessage', function (e) {
       bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
       text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
     });
+    console.log('action_store_settings: ' + localStorage.config);
   }
   
   if (e.payload.KEY_ACTION_GET_WEATHER) {
+    console.log('action_get_weather');
     getWeather();
   }
 });
@@ -37,25 +42,37 @@ function sendConfigData() {
     'KEY_BG_COLOR': hexToGColor(config.bg_color),
     'KEY_TEXT_COLOR': hexToGColor(config.text_color)
   };
-  Pebble.sendAppMessage(dict, function (e) {}, function (e) {console.error('error sending config data to Pebble: ' + e);});
+  Pebble.sendAppMessage(dict, function (e) {}, function (e) {
+    console.error('error sending config data to Pebble: ' + e);
+  });
 }
 
 function getWeather() {
   navigator.geolocation.getCurrentPosition(
     locationSuccess,
-    locationError,
+    function (e) {
+      console.error('error requesting location: ' + String(e));
+    },
     { enableHighAccuracy: false,
       timeout: 60 * 1000,
       maximumAge: 15 * 60 * 1000 }
   );
 }
 
-function locationError(err) {
-  console.log('error requesting location!');
-}
+var DAYS_ABBR = [
+  'Sun',
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat'
+];
+var sunrise, sunset;
 
 function locationSuccess(pos) {
-  var locationArgs = 'lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude;
+  var locationArgs = 'APPID=' + OPENWEATHERMAP_API_KEY +
+                     '&lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude;
   var url = 'http://api.openweathermap.org/data/2.5/weather?' + locationArgs;
   xhrRequest(url, 'GET', function (responseText) {
     var json = JSON.parse(responseText);
@@ -96,9 +113,14 @@ function locationSuccess(pos) {
           appData['KEY_FORECAST_' + i + '_CONDITIONS'] = getWeatherIcon(data.weather[0], false);
           appData['KEY_FORECAST_' + i + '_DAY'] = DAYS_ABBR[(new Date(data.dt * 1000)).getDay()];
         });
-        Pebble.sendAppMessage(appData, function (e) {}, function (e) {console.error('error sending weather data to Pebble: ' + e);});
+        
+        Pebble.sendAppMessage(appData, function (e) {}, function (e) {
+          console.error('error sending forecast data to Pebble: ' + e);
+        });
       });
-    }, function (e) {console.error('error requesting current weather!');});
+    }, function (e) {
+      console.error('error sending current weather data to Pebble: ' + e);
+    });
   });
 }
 
@@ -113,6 +135,7 @@ function xhrRequest(url, type, callback, retry) {
       callback(this.responseText);
     } catch (e) {
       if (retry < RETRIES) {
+        console.log('XMLHttpRequest failed ' + ( retry + 1 ) + ' times, trying again (' + String(e) + ')');
         setTimeout(function () {
           xhrRequest(url, type, callback, retry + 1);
         }, RETRY_PAUSE);
@@ -123,7 +146,7 @@ function xhrRequest(url, type, callback, retry) {
   };
   xhr.open(type, url);
   xhr.send();
-};
+}
 
 function KtoC(k) {
   return k - 273.15;
@@ -147,25 +170,12 @@ function hexToGColor(hex) {
 
 function gColorToHex(gColor) {
   return ( '000000' +
-           ( ( ( gColor >> 4 & 0b11 ) * 0xff / 0b11 << 16 ) +
-             ( ( gColor >> 2 & 0b11 ) * 0xff / 0b11 << 8  ) +
-             ( ( gColor >> 0 & 0b11 ) * 0xff / 0b11       ) )
+           ( ( ( gColor >> 4 & 3 ) * 0xff / 3 << 16 ) +
+             ( ( gColor >> 2 & 3 ) * 0xff / 3 << 8  ) +
+             ( ( gColor >> 0 & 3 ) * 0xff / 3       ) )
              .toString(16) )
            .slice(-6);
 }
-
-var DAYS_ABBR = [
-  'Sun',
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat'
-];
-var WEATHER_ICONS;
-var TODAYS_FORECAST_HOURS_CUTOFF = 15;
-var sunrise, sunset;
 
 function getWeatherIcon(weatherInfo, isNight) {
   var date = new Date();
@@ -177,9 +187,9 @@ function getWeatherIcon(weatherInfo, isNight) {
   var icon;
   if (isNight) icon = WEATHER_ICONS[weatherInfo.id + '-n'];
   return icon || WEATHER_ICONS[weatherInfo.id];
-};
+}
 
-WEATHER_ICONS = {
+var WEATHER_ICONS = {
   "": "?",
 /*   Thunderstorm - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
 /* thunderstorm with light rain */

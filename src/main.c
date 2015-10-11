@@ -529,7 +529,7 @@ static void store_settings() {
 }
 
 static void _get_weather() {
-  //APP_LOG(APP_LOG_LEVEL_INFO, "_get_weather()");
+  APP_LOG(APP_LOG_LEVEL_INFO, "_get_weather()");
   s_action_store_settings = 1;
   s_action_get_weather = 1;
   outbox_send();
@@ -540,7 +540,7 @@ static void get_weather() {
   if (current_time - s_outbox_send_last_action > GET_WEATHER_TIMEOUT) {
     s_outbox_send_last_action = current_time;
     s_outbox_send_current_try = 0;
-    get_weather();
+    _get_weather();
   }
 }
 
@@ -569,7 +569,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-  //APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped: %d", reason);
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped: %d", reason);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -628,7 +628,7 @@ static void init() {
         s_bg_color = GColorBlackARGB8;
       }
     #endif
-      
+
     store_settings();
   } else {
     get_weather();
@@ -654,39 +654,33 @@ static void deinit() {
     accel_tap_service_unsubscribe();
   #endif*/
   
-  int stored_get_weather_last_received = persist_exists(KEY_GET_WEATHER_LAST_RECEIVED) ? persist_read_int(KEY_GET_WEATHER_LAST_RECEIVED) : 0;
-  if (s_get_weather_last_received != stored_get_weather_last_received) {
-    persist_write_int(KEY_GET_WEATHER_LAST_RECEIVED, s_get_weather_last_received);
+  persist_write_int(KEY_GET_WEATHER_LAST_RECEIVED, s_get_weather_last_received);
     
-    persist_write_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer);
-    persist_write_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer);
-    persist_write_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer);
-    persist_write_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer);
-    persist_write_string(KEY_FORECAST_0_MIN_C, s_forecast_0_min_c_buffer);
-    persist_write_string(KEY_FORECAST_0_MIN_F, s_forecast_0_min_f_buffer);
-    persist_write_string(KEY_FORECAST_0_MAX_C, s_forecast_0_max_c_buffer);
-    persist_write_string(KEY_FORECAST_0_MAX_F, s_forecast_0_max_f_buffer);
-    persist_write_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer);
-    persist_write_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer);
-    persist_write_string(KEY_FORECAST_1_MIN_C, s_forecast_1_min_c_buffer);
-    persist_write_string(KEY_FORECAST_1_MIN_F, s_forecast_1_min_f_buffer);
-    persist_write_string(KEY_FORECAST_1_MAX_C, s_forecast_1_max_c_buffer);
-    persist_write_string(KEY_FORECAST_1_MAX_F, s_forecast_1_max_f_buffer);
-    persist_write_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer);
-    persist_write_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer);
-    persist_write_string(KEY_FORECAST_2_MIN_C, s_forecast_2_min_c_buffer);
-    persist_write_string(KEY_FORECAST_2_MIN_F, s_forecast_2_min_f_buffer);
-    persist_write_string(KEY_FORECAST_2_MAX_C, s_forecast_2_max_c_buffer);
-    persist_write_string(KEY_FORECAST_2_MAX_F, s_forecast_2_max_f_buffer);
-    persist_write_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer);
-  }
+  persist_write_string(KEY_WEATHER_TEMP_C, s_weather_temp_c_buffer);
+  persist_write_string(KEY_WEATHER_TEMP_F, s_weather_temp_f_buffer);
+  persist_write_string(KEY_WEATHER_CONDITIONS, s_weather_conditions_buffer);
+  persist_write_string(KEY_FORECAST_0_DAY, s_forecast_0_day_buffer);
+  persist_write_string(KEY_FORECAST_0_MIN_C, s_forecast_0_min_c_buffer);
+  persist_write_string(KEY_FORECAST_0_MIN_F, s_forecast_0_min_f_buffer);
+  persist_write_string(KEY_FORECAST_0_MAX_C, s_forecast_0_max_c_buffer);
+  persist_write_string(KEY_FORECAST_0_MAX_F, s_forecast_0_max_f_buffer);
+  persist_write_string(KEY_FORECAST_0_CONDITIONS, s_forecast_0_conditions_buffer);
+  persist_write_string(KEY_FORECAST_1_DAY, s_forecast_1_day_buffer);
+  persist_write_string(KEY_FORECAST_1_MIN_C, s_forecast_1_min_c_buffer);
+  persist_write_string(KEY_FORECAST_1_MIN_F, s_forecast_1_min_f_buffer);
+  persist_write_string(KEY_FORECAST_1_MAX_C, s_forecast_1_max_c_buffer);
+  persist_write_string(KEY_FORECAST_1_MAX_F, s_forecast_1_max_f_buffer);
+  persist_write_string(KEY_FORECAST_1_CONDITIONS, s_forecast_1_conditions_buffer);
+  persist_write_string(KEY_FORECAST_2_DAY, s_forecast_2_day_buffer);
+  persist_write_string(KEY_FORECAST_2_MIN_C, s_forecast_2_min_c_buffer);
+  persist_write_string(KEY_FORECAST_2_MIN_F, s_forecast_2_min_f_buffer);
+  persist_write_string(KEY_FORECAST_2_MAX_C, s_forecast_2_max_c_buffer);
+  persist_write_string(KEY_FORECAST_2_MAX_F, s_forecast_2_max_f_buffer);
+  persist_write_string(KEY_FORECAST_2_CONDITIONS, s_forecast_2_conditions_buffer);
   
-  int stored_bg_color = persist_exists(KEY_BG_COLOR) ? persist_read_int(KEY_BG_COLOR) : 0;
-  if (s_bg_color != stored_bg_color) {
-    persist_write_string(KEY_TEMP_UNITS, s_temp_units);
-    persist_write_int(KEY_BG_COLOR, s_bg_color);
-    persist_write_int(KEY_TEXT_COLOR, s_text_color);
-  }
+  persist_write_string(KEY_TEMP_UNITS, s_temp_units);
+  persist_write_int(KEY_BG_COLOR, s_bg_color);
+  persist_write_int(KEY_TEXT_COLOR, s_text_color);
 }
 
 int main(void) {
