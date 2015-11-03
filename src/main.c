@@ -58,7 +58,8 @@ enum {
   KEY_GET_WEATHER_LAST_RECEIVED = 25,
   KEY_ACTION_STORE_SETTINGS = 26,
   KEY_ACTION_GET_WEATHER = 27,
-  KEY_SUPPORTS_COLOR = 28
+  KEY_SUPPORTS_COLOR = 28,
+  KEY_READY = 29
 };
 
 static char s_temp_units[] = "f";
@@ -189,7 +190,7 @@ static void update_ui() {
   text_layer_set_text(s_weather_conditions_layer, s_weather_conditions_buffer);
   text_layer_set_text(s_forecast_0_day_layer, s_forecast_0_day_buffer);
   text_layer_set_text(s_forecast_0_min_layer, temp_c ? s_forecast_0_min_c_buffer : s_forecast_0_min_f_buffer);
-  text_layer_set_text(s_forecast_0_max_layer, temp_c ? s_forecast_0_max_c_buffer : s_forecast_0_min_f_buffer);
+  text_layer_set_text(s_forecast_0_max_layer, temp_c ? s_forecast_0_max_c_buffer : s_forecast_0_max_f_buffer);
   text_layer_set_text(s_forecast_0_conditions_layer, s_forecast_0_conditions_buffer);
   text_layer_set_text(s_forecast_1_day_layer, s_forecast_1_day_buffer);
   text_layer_set_text(s_forecast_1_min_layer, temp_c ? s_forecast_1_min_c_buffer : s_forecast_1_min_f_buffer);
@@ -397,12 +398,58 @@ static void main_window_unload(Window *window) {
   fonts_unload_custom_font(s_font_small_text);
 }
 
+
+static int s_outbox_send_current_try = 0;
+static time_t s_outbox_send_last_action = 0;
+static int s_get_weather_last_received = 0;
+static uint8_t s_action_store_settings = 0;
+static uint8_t s_action_get_weather = 0;
+static bool s_ready = false;
+static bool s_outbox_send_pending_ready = false;
+
+static void _outbox_send() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "_outbox_send()");
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  if (s_action_store_settings) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "action:store_settings");
+    dict_write_uint8(iter, KEY_ACTION_STORE_SETTINGS, s_action_store_settings);
+    dict_write_uint8(iter, KEY_SUPPORTS_COLOR, supports_color ? 1 : 0);
+    dict_write_cstring(iter, KEY_TEMP_UNITS, s_temp_units);
+    dict_write_uint8(iter, KEY_BG_COLOR, s_bg_color);
+    dict_write_uint8(iter, KEY_TEXT_COLOR, s_text_color);
+  }
+  
+  if (s_action_get_weather) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "action:get_weather");
+    dict_write_uint8(iter, KEY_ACTION_GET_WEATHER, s_action_get_weather);
+  }
+  
+  app_message_outbox_send();
+}
+
+static void outbox_send() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "outbox_send()");
+  if (s_ready) {
+    _outbox_send();
+  } else {
+    s_outbox_send_pending_ready = true;
+  }
+}
+
 static bool _inbox_received_callback(DictionaryIterator *iterator, void *context) {
   Tuple *t = dict_read_first(iterator);
   bool received_weather = false;
 
   while(t != NULL) {
     switch(t->key) {
+      case KEY_READY:
+        s_ready = true;
+        if (s_outbox_send_pending_ready) {
+          _outbox_send();
+        }
+      break;
+      
       case KEY_TEMP_UNITS:
         strcpy(s_temp_units, t->value->cstring);
       break;
@@ -494,48 +541,22 @@ static bool _inbox_received_callback(DictionaryIterator *iterator, void *context
   return received_weather;
 }
 
-static int s_outbox_send_current_try = 0;
-static time_t s_outbox_send_last_action = 0;
-static int s_get_weather_last_received = 0;
-static uint8_t s_action_store_settings = 0;
-static uint8_t s_action_get_weather = 0;
-
-static void outbox_send() {
-  DictionaryIterator *iter;
-  app_message_outbox_begin(&iter);
-  //APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send");
-  if (s_action_store_settings) {
-    //APP_LOG(APP_LOG_LEVEL_INFO, "  s_action_store_settings");
-    dict_write_uint8(iter, KEY_ACTION_STORE_SETTINGS, s_action_store_settings);
-    dict_write_uint8(iter, KEY_SUPPORTS_COLOR, supports_color ? 1 : 0);
-    dict_write_cstring(iter, KEY_TEMP_UNITS, s_temp_units);
-    dict_write_uint8(iter, KEY_BG_COLOR, s_bg_color);
-    dict_write_uint8(iter, KEY_TEXT_COLOR, s_text_color);
-  }
-  
-  if (s_action_get_weather) {
-    //APP_LOG(APP_LOG_LEVEL_INFO, "  s_action_get_weather");
-    dict_write_uint8(iter, KEY_ACTION_GET_WEATHER, s_action_get_weather);
-  }
-  
-  app_message_outbox_send();
-}
-
 static void store_settings() {
-  //APP_LOG(APP_LOG_LEVEL_INFO, "store_settings()");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "store_settings()");
   s_action_store_settings = 1;
   s_action_get_weather = 0;
   outbox_send();
 }
 
 static void _get_weather() {
-  APP_LOG(APP_LOG_LEVEL_INFO, "_get_weather()");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "_get_weather()");
   s_action_store_settings = 1;
   s_action_get_weather = 1;
   outbox_send();
 }
 
 static void get_weather() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "get_weather()");
   time_t current_time = time(NULL);
   if (current_time - s_outbox_send_last_action > GET_WEATHER_TIMEOUT) {
     s_outbox_send_last_action = current_time;
@@ -545,7 +566,7 @@ static void get_weather() {
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-  //APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "outbox_sent_callback()");
   s_action_get_weather = 0;
   s_action_store_settings = 0;
   s_outbox_send_last_action = time(NULL);
@@ -562,7 +583,7 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  //APP_LOG(APP_LOG_LEVEL_INFO, "Inbox receive success!");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "inbox_received_callback()");
   if (_inbox_received_callback(iterator, context)) {
     s_get_weather_last_received = (int)time(NULL);
   }
@@ -575,8 +596,9 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time(tick_time);
   
-  int now = (int)time(NULL);
-  if (now - s_get_weather_last_received >= WEATHER_UPDATE_MINUTES * 60) {
+  int elapsed = (int)time(NULL) - s_get_weather_last_received;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "elapsed = %d", elapsed);
+  if (elapsed >= WEATHER_UPDATE_MINUTES * 60) {
     get_weather();
   }
 }

@@ -1,13 +1,24 @@
 var TODAYS_FORECAST_HOURS_CUTOFF = 15; // 3:00 PM
 var OPENWEATHERMAP_API_KEY = '746ca9a1c69c304bec844202dd4a501e';
 
+Pebble.addEventListener('ready', function (e) {
+  console.debug('listener:ready');
+  console.debug('sendAppMessage:ready');
+  Pebble.sendAppMessage({ KEY_READY: 1 }, function (e) {
+    console.debug('sendAppMessage:ready:success');
+  }, function (e) {
+    console.error('sendAppMessage:ready:error: ' + String(e));
+  });
+});
+
 Pebble.addEventListener('showConfiguration', function(e) {
-  // Show config page
+  console.debug('listener:showConfiguration');
   var configJson = localStorage.config;
   Pebble.openURL('http://benkrejci.com/fourcast/config.html#' + encodeURIComponent(configJson));
 });
 
 Pebble.addEventListener('webviewclosed', function (e) {
+  console.debug('listener:webviewclosed');
   var configJson = decodeURIComponent(e.response);
   if (!configJson || configJson == '{}') return;
   localStorage.config = configJson;
@@ -15,6 +26,7 @@ Pebble.addEventListener('webviewclosed', function (e) {
 });
 
 Pebble.addEventListener('appmessage', function (e) {
+  console.debug('listener:appmessage');
   if (e.payload.KEY_ACTION_STORE_SETTINGS) {
     localStorage.config = JSON.stringify({
       supports_color: !!e.payload.KEY_SUPPORTS_COLOR,
@@ -22,18 +34,17 @@ Pebble.addEventListener('appmessage', function (e) {
       bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
       text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
     });
-    console.log('action_store_settings: ' + localStorage.config);
+    console.debug('action:store_settings: ' + localStorage.config);
   }
   
   if (e.payload.KEY_ACTION_GET_WEATHER) {
-    console.log('action_get_weather');
+    console.debug('action:get_weather');
     getWeather();
   }
 });
 
-/*Pebble.addEventListener('ready', function (e) { sendConfigData(); });*/
-
 function sendConfigData() {
+  console.debug('sendConfigData()');
   var configJson = localStorage.config;
   if (!configJson) return;
   var config = JSON.parse(configJson);
@@ -42,16 +53,20 @@ function sendConfigData() {
     'KEY_BG_COLOR': hexToGColor(config.bg_color),
     'KEY_TEXT_COLOR': hexToGColor(config.text_color)
   };
-  Pebble.sendAppMessage(dict, function (e) {}, function (e) {
-    console.error('error sending config data to Pebble: ' + e);
+  console.debug('sendAppMessage:configData: ' + JSON.stringify(dict));
+  Pebble.sendAppMessage(dict, function (e) {
+    console.debug('sendAppMessage:configData:success');
+  }, function (e) {
+    console.error('sendAppMessage:configData:error: ' + String(e));
   });
 }
 
 function getWeather() {
+  console.debug('getWeather()');
   navigator.geolocation.getCurrentPosition(
     locationSuccess,
     function (e) {
-      console.error('error requesting location: ' + String(e));
+      console.error('getCurrentPosition:error: ' + String(e));
     },
     { enableHighAccuracy: false,
       timeout: 60 * 1000,
@@ -71,10 +86,11 @@ var DAYS_ABBR = [
 var sunrise, sunset;
 
 function locationSuccess(pos) {
+  console.debug('locationSuccess([' + pos.coords.latitude + ',' + pos.coords.longitude + '])');
   var locationArgs = 'APPID=' + OPENWEATHERMAP_API_KEY +
                      '&lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude;
   var url = 'http://api.openweathermap.org/data/2.5/weather?' + locationArgs;
-  xhrRequest(url, 'GET', function (responseText) {
+  xhr(url, 'GET', function (responseText) {
     var json = JSON.parse(responseText);
     sunrise = new Date(json.sys.sunrise * 1000);
     sunset = new Date(json.sys.sunset * 1000);
@@ -88,9 +104,11 @@ function locationSuccess(pos) {
       'KEY_CITY': json.name
     };
     
+    console.debug('sendAppMessage:weather: ' + JSON.stringify(appData));
     Pebble.sendAppMessage(appData, function (e) {
+      console.debug('sendAppMessage:weather:success');
       var url = 'http://api.openweathermap.org/data/2.5/forecast/daily?cnt=5&' + locationArgs;
-      xhrRequest(url, 'GET', function (responseText) {
+      xhr(url, 'GET', function (responseText) {
         var json = JSON.parse(responseText);
         var appData = {};
         var date = new Date();
@@ -114,33 +132,38 @@ function locationSuccess(pos) {
           appData['KEY_FORECAST_' + i + '_DAY'] = DAYS_ABBR[(new Date(data.dt * 1000)).getDay()];
         });
         
-        Pebble.sendAppMessage(appData, function (e) {}, function (e) {
-          console.error('error sending forecast data to Pebble: ' + e);
+        console.debug('sendAppMessage:forecast:' + JSON.stringify(appData));
+        Pebble.sendAppMessage(appData, function (e) {
+          console.debug('sendAppMessage:forecast:success');
+        }, function (e) {
+          console.error('sendAppMessage:forecast:error: ' + e);
         });
       });
     }, function (e) {
-      console.error('error sending current weather data to Pebble: ' + e);
+      console.error('sendAppMessage:weather:error: ' + e);
     });
   });
 }
 
 var RETRIES = 3;
 var RETRY_PAUSE = 5 * 1000;
-function xhrRequest(url, type, callback, retry) {
+function xhr(url, type, callback, retry) {
+  console.debug('xhr:start:' + url);
   retry = retry || 0;
   var xhr = new XMLHttpRequest();
   xhr.onload = function () {
     try {
       if (!this.responseText) throw new Error('No data!');
+      console.debug('xhr:success: ' + this.responseText);
       callback(this.responseText);
     } catch (e) {
       if (retry < RETRIES) {
-        console.log('XMLHttpRequest failed ' + ( retry + 1 ) + ' times, trying again (' + String(e) + ')');
+        console.error('xhr:fail: ' + ( retry + 1 ) + ' times, trying again (' + String(e) + ')');
         setTimeout(function () {
-          xhrRequest(url, type, callback, retry + 1);
+          xhr(url, type, callback, retry + 1);
         }, RETRY_PAUSE);
       } else {
-        console.error('XMLHttpRequest failed ' + ( retry + 1 ) + ' times: ' + String(e));
+        console.error('xhr:fail: ' + ( retry + 1 ) + ' times: ' + String(e));
       }
     }
   };

@@ -22,6 +22,7 @@
         "KEY_FORECAST_2_MAX_F": 19,
         "KEY_FORECAST_2_MIN_C": 16,
         "KEY_FORECAST_2_MIN_F": 17,
+        "KEY_READY": 29,
         "KEY_SUPPORTS_COLOR": 28,
         "KEY_TEMP_UNITS": 22,
         "KEY_TEXT_COLOR": 24,
@@ -74,7 +75,7 @@
         "basalt"
     ],
     "uuid": "7a7c8159-2036-44b3-b92b-182ddc9ef8de",
-    "versionLabel": "0.6",
+    "versionLabel": "0.7",
     "watchapp": {
         "watchface": true
     }
