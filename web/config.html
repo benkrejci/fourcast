@@ -13,6 +13,21 @@
   var data;
   var $fields;
 
+  function toClassName(str) {
+    return String(str)
+           .replace(/\s/, '_');
+  }
+
+  function onChange(name, value) {
+    name = toClassName(name);
+    value = toClassName(value);
+
+    $('.field-name-' + name)
+      .hide()
+      .filter('.field-value-' + value)
+        .show();
+  }
+
   function load() {
     if (data.supports_color) {
       $('.not-supports-color').remove();
@@ -26,14 +41,30 @@
       var $input = $field.find('input');
       var name = $field.attr('name') || $input.attr('name');
       var value = data[name];
-      if (value == null) return;
+
       if ($input.attr('type') == 'radio') {
-        $input.filter('[name=' + name + '][value=' + value + ']').prop('checked', true);
-        $field.controlgroup('refresh');
+        $input.change(function () {
+          value = $input.filter('[name=' + name + ']:checked')
+                        .attr('value');
+          onChange(name, value);
+        });
+
+        if (value != null) {
+          $input.filter('[name=' + name + '][value=' + value + ']').prop('checked', true);
+          $field.controlgroup('refresh');
+        }
       } else {
-        $field.val(value);
+        $field.change(function () {
+          value = $field.val();
+          onChange(name, value);
+        });
+
+        if (value != null) {
+          $field.val(value);
+        }
       }
-      $field.change();
+
+      $input.add($field).change();
     });
   }
 
@@ -58,6 +89,19 @@
         data.text_color = '000000';
       }
     delete data.inverted;
+
+    return validate(data);
+  }
+
+  function validate(data) {
+    if ( data.weather_service == 'Weather Underground' &&
+         $.trim(data.weather_underground_api_key || '') == '' ) {
+      alert("The Weather Underground service needs an API key.\n\n" +
+            "Either provide an API key, or select OpenWeatherMap as the weather service.");
+      return false;
+    }
+
+    return true;
   }
 
   function close() {
@@ -69,8 +113,8 @@
 
     $('#done').click(function (e) {
       e.preventDefault();
-      save();
-      close();
+      if (save())
+        close();
     });
 
     var c, colors = [];
@@ -178,6 +222,24 @@
             <input type="radio" name="inverted" id="inverted_1" value="1">
             <label for="inverted_1">Inverted</label>
           </fieldset>
+        </div>
+
+        <fieldset data-role="controlgroup" data-type="vertical" class="field ui-field-contain">
+          <legend>Weather Service</legend>
+          <input type="radio" name="weather_service" id="weather_service_OpenWeatherMap" value="OpenWeatherMap">
+          <label for="weather_service_OpenWeatherMap">OpenWeatherMap</label>
+          <input type="radio" name="weather_service" id="weather_service_Weather_Underground" value="Weather Underground">
+          <label for="weather_service_Weather_Underground">Weather Underground (more accurate)</label>
+        </fieldset>
+
+        <div class="ui-field-contain field-name-weather_service field-value-Weather_Underground">
+          <a href="http://wunderground.com" target="_blank"><img src="images/wundergroundLogo_4c_horz.png" style="width:100%;max-width:28em;" /></a>
+          <p>To use Weather Underground, obtain an <a href="http://www.wunderground.com/weather/api/" target="_blank">API key</a> and paste it below.</p>
+        </div>
+
+        <div class="ui-field-contain field-name-weather_service field-value-Weather_Underground">
+          <label for="weather_underground_api_key">Weather Underground API Key</label>
+          <input type="text" name="weather_underground_api_key" id="weather_underground_api_key" class="field" />
         </div>
       </div>
     </div>
