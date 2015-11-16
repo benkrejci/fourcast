@@ -1,4 +1,5 @@
 var TODAYS_FORECAST_HOURS_CUTOFF = 15; // 3:00 PM
+var CONFIG_PAGE_URL = 'http://benkrejci.com/fourcast/config1.html';
 var OPENWEATHERMAP_API_KEY = '746ca9a1c69c304bec844202dd4a501e';
 
 Pebble.addEventListener('ready', function (e) {
@@ -14,7 +15,7 @@ Pebble.addEventListener('ready', function (e) {
 Pebble.addEventListener('showConfiguration', function(e) {
   console.debug('listener:showConfiguration');
   var configJson = localStorage.config;
-  Pebble.openURL('http://benkrejci.com/fourcast/config.html#' + encodeURIComponent(configJson));
+  Pebble.openURL(CONFIG_PAGE_URL + '#' + encodeURIComponent(configJson));
 });
 
 Pebble.addEventListener('webviewclosed', function (e) {
