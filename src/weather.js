@@ -1,5 +1,5 @@
 var TODAYS_FORECAST_HOURS_CUTOFF = 15; // 3:00 PM
-var CONFIG_PAGE_URL = 'http://benkrejci.com/fourcast/config1.html';
+var CONFIG_PAGE_URL = 'http://benkrejci.com/fourcast/0.8/config.html';
 var OPENWEATHERMAP_API_KEY = '746ca9a1c69c304bec844202dd4a501e';
 
 Pebble.addEventListener('ready', function (e) {
@@ -20,8 +20,15 @@ Pebble.addEventListener('showConfiguration', function(e) {
 
 Pebble.addEventListener('webviewclosed', function (e) {
   console.debug('listener:webviewclosed');
-  var configJson = decodeURIComponent(e.response);
-  if (!configJson || configJson == '{}') return;
+  if (!e.response) return;
+  var configJson;
+  try {
+    configJson = decodeURIComponent(e.response);
+  } catch (error) {
+    return;
+  }
+  if ( !configJson || configJson == '{}' ||
+       configJson == localStorage.config ) return;
   localStorage.config = configJson;
   sendConfigData();
 });
@@ -33,7 +40,8 @@ Pebble.addEventListener('appmessage', function (e) {
       supports_color: !!e.payload.KEY_SUPPORTS_COLOR,
       temp_units: e.payload.KEY_TEMP_UNITS,
       bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
-      text_color: gColorToHex(e.payload.KEY_TEXT_COLOR)
+      text_color: gColorToHex(e.payload.KEY_TEXT_COLOR),
+      weather_service: e.payload.KEY_WEATHER_SERVICE
     });
     console.debug('action:store_settings: ' + localStorage.config);
   }
@@ -50,9 +58,10 @@ function sendConfigData() {
   if (!configJson) return;
   var config = JSON.parse(configJson);
   var dict = {
-    'KEY_TEMP_UNITS': config.temp_units,
-    'KEY_BG_COLOR': hexToGColor(config.bg_color),
-    'KEY_TEXT_COLOR': hexToGColor(config.text_color)
+    KEY_TEMP_UNITS: config.temp_units,
+    KEY_BG_COLOR: hexToGColor(config.bg_color),
+    KEY_TEXT_COLOR: hexToGColor(config.text_color),
+    KEY_WEATHER_SERVICE: config.weather_service
   };
   console.debug('sendAppMessage:configData: ' + JSON.stringify(dict));
   Pebble.sendAppMessage(dict, function (e) {

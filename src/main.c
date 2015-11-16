@@ -59,12 +59,14 @@ enum {
   KEY_ACTION_STORE_SETTINGS = 26,
   KEY_ACTION_GET_WEATHER = 27,
   KEY_SUPPORTS_COLOR = 28,
-  KEY_READY = 29
+  KEY_READY = 29,
+  KEY_WEATHER_SERVICE = 30
 };
 
 static char s_temp_units[] = "f";
 static uint8_t s_bg_color = COLOR_BG;
 static uint8_t s_text_color = COLOR_TEXT;
+static char s_weather_service[32] = "OpenWeatherMap";
 static int s_batt_percent = 0;
 /*static char s_battery_buffer[] = "---";*/
 static char s_time_buffer[] = "XX:XX";
@@ -418,6 +420,7 @@ static void _outbox_send() {
     dict_write_cstring(iter, KEY_TEMP_UNITS, s_temp_units);
     dict_write_uint8(iter, KEY_BG_COLOR, s_bg_color);
     dict_write_uint8(iter, KEY_TEXT_COLOR, s_text_color);
+    dict_write_cstring(iter, KEY_WEATHER_SERVICE, s_weather_service);
   }
   
   if (s_action_get_weather) {
@@ -451,13 +454,16 @@ static bool _inbox_received_callback(DictionaryIterator *iterator, void *context
       break;
       
       case KEY_TEMP_UNITS:
-        strcpy(s_temp_units, t->value->cstring);
+        strncpy(s_temp_units, t->value->cstring, sizeof(s_temp_units));
       break;
       case KEY_BG_COLOR:
         s_bg_color = t->value->uint8;
       break;
       case KEY_TEXT_COLOR:
         s_text_color = t->value->uint8;
+      break;
+      case KEY_WEATHER_SERVICE:
+        strncpy(s_weather_service, t->value->cstring, sizeof(s_weather_service));
       break;
       
       case KEY_CITY:
@@ -642,6 +648,7 @@ static void init() {
     persist_read_string(KEY_TEMP_UNITS, s_temp_units, sizeof(s_temp_units));
     s_bg_color = persist_read_int(KEY_BG_COLOR);
     s_text_color = persist_read_int(KEY_TEXT_COLOR);
+    persist_read_string(KEY_WEATHER_SERVICE, s_weather_service, sizeof(s_weather_service));
     
     #ifndef PBL_COLOR
       if (( s_text_color != GColorWhiteARGB8 && s_text_color != GColorBlackARGB8 ) ||
@@ -703,6 +710,7 @@ static void deinit() {
   persist_write_string(KEY_TEMP_UNITS, s_temp_units);
   persist_write_int(KEY_BG_COLOR, s_bg_color);
   persist_write_int(KEY_TEXT_COLOR, s_text_color);
+  persist_write_string(KEY_WEATHER_SERVICE, s_weather_service);
 }
 
 int main(void) {

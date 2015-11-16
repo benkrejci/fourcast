@@ -27,6 +27,7 @@
         "KEY_TEMP_UNITS": 22,
         "KEY_TEXT_COLOR": 24,
         "KEY_WEATHER_CONDITIONS": 2,
+        "KEY_WEATHER_SERVICE": 30,
         "KEY_WEATHER_TEMP_C": 0,
         "KEY_WEATHER_TEMP_F": 1
     },
