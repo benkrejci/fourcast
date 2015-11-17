@@ -44,13 +44,13 @@
 
       if ($input.attr('type') == 'radio') {
         $input.change(function () {
-          value = $input.filter('[name=' + name + ']:checked')
+          value = $input.filter("[name='" + name + "']:checked")
                         .attr('value');
           onChange(name, value);
         });
 
         if (value != null) {
-          $input.filter('[name=' + name + '][value=' + value + ']').prop('checked', true);
+          $input.filter("[name='" + name + "'][value='" + value + "']").prop('checked', true);
           $field.controlgroup('refresh');
         }
       } else {
@@ -233,8 +233,8 @@
         </fieldset>
 
         <div class="ui-field-contain field-name-weather_service field-value-Weather_Underground">
-          <a href="http://wunderground.com" target="_blank"><img src="images/wundergroundLogo_4c_horz.png" style="width:100%;max-width:28em;" /></a>
-          <p>To use Weather Underground, obtain an <a href="http://www.wunderground.com/weather/api/" target="_blank">API key</a> and paste it below.</p>
+          <img src="images/wundergroundLogo_4c_horz.png" style="width:100%;max-width:28em;" />
+          <p>To use Weather Underground, obtain an API key from www.wunderground.com/weather/api/ and paste it below.</p>
         </div>
 
         <div class="ui-field-contain field-name-weather_service field-value-Weather_Underground">
