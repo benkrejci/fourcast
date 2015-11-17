@@ -29,7 +29,8 @@
         "KEY_WEATHER_CONDITIONS": 2,
         "KEY_WEATHER_SERVICE": 30,
         "KEY_WEATHER_TEMP_C": 0,
-        "KEY_WEATHER_TEMP_F": 1
+        "KEY_WEATHER_TEMP_F": 1,
+        "KEY_WEATHER_UNDERGROUND_API_KEY": 31
     },
     "capabilities": [
         "location",
@@ -41,16 +42,6 @@
     "resources": {
         "media": [
             {
-                "file": "fonts/Square.ttf",
-                "name": "SQUARE_18",
-                "type": "font"
-            },
-            {
-                "file": "fonts/Square.ttf",
-                "name": "SQUARE_54",
-                "type": "font"
-            },
-            {
                 "file": "images/fourcast 1.png",
                 "menuIcon": true,
                 "name": "PREVIEW",
@@ -59,6 +50,16 @@
             {
                 "file": "fonts/owfont-regular.ttf",
                 "name": "WEATHER_ICONS_26",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Square.ttf",
+                "name": "SQUARE_54",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Square.ttf",
+                "name": "SQUARE_18",
                 "type": "font"
             },
             {

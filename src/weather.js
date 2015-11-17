@@ -2,6 +2,8 @@ var TODAYS_FORECAST_HOURS_CUTOFF = 15; // 3:00 PM
 var CONFIG_PAGE_URL = 'http://benkrejci.com/fourcast/0.8/config.html';
 var OPENWEATHERMAP_API_KEY = '746ca9a1c69c304bec844202dd4a501e';
 
+var configDict;
+
 Pebble.addEventListener('ready', function (e) {
   console.debug('listener:ready');
   console.debug('sendAppMessage:ready');
@@ -29,6 +31,11 @@ Pebble.addEventListener('webviewclosed', function (e) {
   }
   if ( !configJson || configJson == '{}' ||
        configJson == localStorage.config ) return;
+  try {
+    configDict = JSON.parse(configJson);
+  } catch (error) {
+    return;
+  }
   localStorage.config = configJson;
   sendConfigData();
 });
@@ -36,13 +43,15 @@ Pebble.addEventListener('webviewclosed', function (e) {
 Pebble.addEventListener('appmessage', function (e) {
   console.debug('listener:appmessage');
   if (e.payload.KEY_ACTION_STORE_SETTINGS) {
-    localStorage.config = JSON.stringify({
+    configDict = {
       supports_color: !!e.payload.KEY_SUPPORTS_COLOR,
       temp_units: e.payload.KEY_TEMP_UNITS,
       bg_color: gColorToHex(e.payload.KEY_BG_COLOR),
       text_color: gColorToHex(e.payload.KEY_TEXT_COLOR),
-      weather_service: e.payload.KEY_WEATHER_SERVICE
-    });
+      weather_service: e.payload.KEY_WEATHER_SERVICE,
+      weather_underground_api_key: e.payload.KEY_WEATHER_UNDERGROUND_API_KEY
+    };
+    localStorage.config = JSON.stringify(configDict);
     console.debug('action:store_settings: ' + localStorage.config);
   }
   
@@ -61,11 +70,13 @@ function sendConfigData() {
     KEY_TEMP_UNITS: config.temp_units,
     KEY_BG_COLOR: hexToGColor(config.bg_color),
     KEY_TEXT_COLOR: hexToGColor(config.text_color),
-    KEY_WEATHER_SERVICE: config.weather_service
+    KEY_WEATHER_SERVICE: config.weather_service,
+    KEY_WEATHER_UNDERGROUND_API_KEY: config.weather_underground_api_key
   };
   console.debug('sendAppMessage:configData: ' + JSON.stringify(dict));
   Pebble.sendAppMessage(dict, function (e) {
     console.debug('sendAppMessage:configData:success');
+    getWeather();
   }, function (e) {
     console.error('sendAppMessage:configData:error: ' + String(e));
   });
@@ -93,24 +104,40 @@ var DAYS_ABBR = [
   'Fri',
   'Sat'
 ];
-var sunrise, sunset;
 
 function locationSuccess(pos) {
   console.debug('locationSuccess([' + pos.coords.latitude + ',' + pos.coords.longitude + '])');
+  switch (configDict.weather_service) {
+    case 'OpenWeatherMap':
+      getOpenWeatherMap(pos);
+    break;
+    case 'Weather Underground':
+      getWeatherUnderground(pos);
+    break;
+  }
+}
+
+function getOpenWeatherMap(pos) {
   var locationArgs = 'APPID=' + OPENWEATHERMAP_API_KEY +
                      '&lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude;
   var url = 'http://api.openweathermap.org/data/2.5/weather?' + locationArgs;
   xhr(url, 'GET', function (responseText) {
     var json = JSON.parse(responseText);
-    sunrise = new Date(json.sys.sunrise * 1000);
-    sunset = new Date(json.sys.sunset * 1000);
+    
+    var sunrise = new Date(json.sys.sunrise * 1000);
+    var sunset = new Date(json.sys.sunset * 1000);
+    var date = new Date();
+    var dateMinutes = date.getHours() * 60 + date.getMinutes();
+    var isNight = dateMinutes < ( sunrise.getHours() * 60 + sunrise.getMinutes() ) ||
+                  dateMinutes >= ( sunset.getHours() * 60 + sunset.getMinutes() );
     
     var tempC = KtoC(json.main.temp);
     var tempF = CtoF(tempC);
+    
     var appData = {
       'KEY_WEATHER_TEMP_C': round(tempC),
       'KEY_WEATHER_TEMP_F': round(tempF),
-      'KEY_WEATHER_CONDITIONS': getWeatherIcon(json.weather[0]),
+      'KEY_WEATHER_CONDITIONS': getOpenWeatherMapIcon(json.weather[0] && json.weather[0].id, isNight),
       'KEY_CITY': json.name
     };
     
@@ -126,7 +153,7 @@ function locationSuccess(pos) {
         if (date.getHours() >= TODAYS_FORECAST_HOURS_CUTOFF)
           day++;
         day = day % 7;
-        while ((new Date(json.list[0].dt * 1000)).getDay() != day) {
+        while ((new Date(json.list[0].dt * 1000)).getDay() != day && json.list.length) {
           json.list.shift();
         }
         json.list.slice(0, 3).forEach(function (data, i) {
@@ -138,7 +165,7 @@ function locationSuccess(pos) {
           appData['KEY_FORECAST_' + i + '_MAX_C'] = round(maxC);
           appData['KEY_FORECAST_' + i + '_MIN_F'] = round(minF);
           appData['KEY_FORECAST_' + i + '_MAX_F'] = round(maxF);
-          appData['KEY_FORECAST_' + i + '_CONDITIONS'] = getWeatherIcon(data.weather[0], false);
+          appData['KEY_FORECAST_' + i + '_CONDITIONS'] = getOpenWeatherMapIcon(data.weather[0] && data.weather[0].id, false);
           appData['KEY_FORECAST_' + i + '_DAY'] = DAYS_ABBR[(new Date(data.dt * 1000)).getDay()];
         });
         
@@ -155,16 +182,66 @@ function locationSuccess(pos) {
   });
 }
 
+function getWeatherUnderground(pos) {
+  var url = 'http://api.wunderground.com/api/' +
+            configDict.weather_underground_api_key + '/' +
+            'astronomy/conditions/forecast/' +
+            'q/' + pos.coords.latitude + ',' + pos.coords.longitude +
+            '.json';
+  xhr(url, 'GET', function (responseText) {
+    var json = JSON.parse(responseText);
+    
+    var localTime = json.current_observation.local_time_rfc822.match(/(\d{1,2}):(\d{1,2}):\d{1,2}/);
+    localTime = localTime && { hour: localTime[1], minute: localTime[2] };
+    var localMinutes = localTime && ( parseInt(localTime.hour) * 60 + parseInt(localTime.minute) );
+    var isNight = !isNaN(localTime) &&
+                  ( localMinutes < ( json.sun_phase.sunrise.hour * 60 + json.sun_phase.sunrise.minute ) ||
+                    localMinutes >= ( json.sun_phase.sunset.hour * 60 + json.sun_phase.sunset.minute ) );
+    
+    var appData = {
+      'KEY_WEATHER_TEMP_C': round(json.current_observation.temp_c),
+      'KEY_WEATHER_TEMP_F': round(json.current_observation.temp_f),
+      'KEY_WEATHER_CONDITIONS': getWeatherUndergroundIcon(json.current_observation.icon, isNight),
+      'KEY_CITY': json.current_observation.display_location.city
+    };
+    
+    var date = new Date();
+    var day = date.getDay();
+    if (date.getHours() >= TODAYS_FORECAST_HOURS_CUTOFF)
+      day++;
+    day = day % 7;
+    var forecastday = json.forecast.simpleforecast.forecastday;
+    while ((new Date(parseInt(forecastday[0].date.epoch) * 1000)).getDay() != day && forecastday.length) {
+      forecastday.shift();
+    }
+    forecastday.slice(0, 3).forEach(function (data, i) {
+      appData['KEY_FORECAST_' + i + '_MIN_C'] = round(data.low.celsius);
+      appData['KEY_FORECAST_' + i + '_MAX_C'] = round(data.high.celsius);
+      appData['KEY_FORECAST_' + i + '_MIN_F'] = round(data.low.fahrenheit);
+      appData['KEY_FORECAST_' + i + '_MAX_F'] = round(data.high.fahrenheit);
+      appData['KEY_FORECAST_' + i + '_CONDITIONS'] = getWeatherUndergroundIcon(data.icon, false);
+      appData['KEY_FORECAST_' + i + '_DAY'] = DAYS_ABBR[(new Date(parseInt(data.date.epoch) * 1000)).getDay()];
+    });
+
+    console.debug('sendAppMessage:weather:' + JSON.stringify(appData));
+    Pebble.sendAppMessage(appData, function (e) {
+      console.debug('sendAppMessage:weather:success');
+    }, function (e) {
+      console.error('sendAppMessage:weather:error: ' + e);
+    });
+  });
+}
+
 var RETRIES = 3;
 var RETRY_PAUSE = 5 * 1000;
 function xhr(url, type, callback, retry) {
   console.debug('xhr:start:' + url);
   retry = retry || 0;
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
+  var _xhr = new XMLHttpRequest();
+  _xhr.onload = function () {
     try {
       if (!this.responseText) throw new Error('No data!');
-      console.debug('xhr:success: ' + this.responseText);
+      console.debug('xhr:success: ' + this.responseText.slice(0,32) + '...');
       callback(this.responseText);
     } catch (e) {
       if (retry < RETRIES) {
@@ -177,8 +254,8 @@ function xhr(url, type, callback, retry) {
       }
     }
   };
-  xhr.open(type, url);
-  xhr.send();
+  _xhr.open(type, url);
+  _xhr.send();
 }
 
 function KtoC(k) {
@@ -210,19 +287,11 @@ function gColorToHex(gColor) {
            .slice(-6);
 }
 
-function getWeatherIcon(weatherInfo, isNight) {
-  var date = new Date();
-  isNight = isNight == null ?
-              ( +date < +sunrise || sunrise.getDay() > date.getDay() ) ||
-              ( +date > +sunset  || sunset.getDay()  > date.getDay() )
-            : isNight;
-  if (!weatherInfo) return '';
-  var icon;
-  if (isNight) icon = WEATHER_ICONS[weatherInfo.id + '-n'];
-  return icon || WEATHER_ICONS[weatherInfo.id];
+function getOpenWeatherMapIcon(iconId, isNight) {
+  return isNight && OPEN_WEATHER_MAP_ICONS[iconId + '-n'] || OPEN_WEATHER_MAP_ICONS[iconId];
 }
 
-var WEATHER_ICONS = {
+var OPEN_WEATHER_MAP_ICONS = {
   "": "?",
 /*   Thunderstorm - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
 /* thunderstorm with light rain */
@@ -320,4 +389,50 @@ var WEATHER_ICONS = {
   "960": "\uEE20",
   "961": "\uEE21",
   "962": "\uEE22"
+};
+
+function getWeatherUndergroundIcon(iconName, isNight) {
+  var altIconName = iconName.replace(/^chance/, '');
+  altIconName = altIconName.length != iconName.length && altIconName;
+  var icon = isNight &&
+         ( WEATHER_UNDERGROUND_ICONS[iconName + '-n'] ||
+           ( altIconName &&
+             WEATHER_UNDERGROUND_ICONS[altIconName + '-n'] ) ) ||
+         WEATHER_UNDERGROUND_ICONS[iconName] ||
+           ( altIconName &&
+             WEATHER_UNDERGROUND_ICONS[altIconName] );
+  if (!icon) console.error('getWeatherUndergroundIcon(' + iconName + ',' + isNight + '):error:could not find icon!');
+  return icon;
+}
+
+var WEATHER_UNDERGROUND_ICONS = {
+  "": "?",
+/*   Thunderstorm - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
+  "chancetstorms": "\uEB32",
+  "tstorms": "\uEB33",
+/*   Rain - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
+  "chancerain": "\uEC54",
+  "rain": "\uEC56",
+/*   Snow - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
+  "flurries": "\uECB8",
+  "chancesnow": "\uECB9",
+  "snow": "\uECBA",
+  "sleet": "\uECC3",
+/*   Atmosphere - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
+  "hazy": "\uED31",
+  "fog": "\uED45",
+/*   Clouds - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -    */
+  "clear": "\uED80",
+  "sunny": "\uED80",
+  "clear-n": "\uF168",
+  "sunny-n": "\uF168",
+  "mostlysunny": "\uED81",
+  "mostlysunny-n": "\uF169",
+  "partlycloudy": "\uED81",
+  "partlycloudy-n": "\uF169",
+  "mostlycloudy": "\uED82",
+  "mostlycloudy-n": "\uF16A",
+  "partlysunny": "\uED82",
+  "partlysunny-n": "\uF16A",
+  "cloudy": "\uED84"
 };
