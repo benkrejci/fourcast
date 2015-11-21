@@ -194,9 +194,11 @@ function getWeatherUnderground(pos) {
     var localTime = json.current_observation.local_time_rfc822.match(/(\d{1,2}):(\d{1,2}):\d{1,2}/);
     localTime = localTime && { hour: localTime[1], minute: localTime[2] };
     var localMinutes = localTime && ( parseInt(localTime.hour) * 60 + parseInt(localTime.minute) );
-    var isNight = !isNaN(localTime) &&
-                  ( localMinutes < ( json.sun_phase.sunrise.hour * 60 + json.sun_phase.sunrise.minute ) ||
-                    localMinutes >= ( json.sun_phase.sunset.hour * 60 + json.sun_phase.sunset.minute ) );
+    var isNight = !isNaN(localMinutes) &&
+                  ( localMinutes < ( parseInt(json.sun_phase.sunrise.hour) * 60 +
+                                     parseInt(json.sun_phase.sunrise.minute) ) ||
+                    localMinutes >= ( parseInt(json.sun_phase.sunset.hour) * 60 +
+                                      parseInt(json.sun_phase.sunset.minute) ) );
     
     var appData = {
       'KEY_WEATHER_TEMP_C': round(json.current_observation.temp_c),
